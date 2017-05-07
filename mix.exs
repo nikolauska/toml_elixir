@@ -11,6 +11,7 @@ defmodule TomlElixir.Mixfile do
       dialyzer: [ignore_warnings: "dialyzer.ignore-warnings"],
       deps: deps(),
       package: package(),
+      description: description(),
 
       # Docs
       name: "Toml Elixir",
@@ -36,13 +37,19 @@ defmodule TomlElixir.Mixfile do
 
   defp package do
     [
-      files: ["mix.exs", "lib", "README.md", "CONTRIBUTING.md", "LICENSE.md"],
+      files: ["mix.exs", "lib", "src", "README.md", "LICENSE.md"],
       maintainers: ["Niko Lehtovirta"],
       licenses: ["MIT"],
       links: %{
         "Github" => "https://github.com/nikolauska/toml_elixir"
       }
     ]
+  end
+
+  defp description do
+    """
+    TOML parser for elixir
+    """
   end
 
   # Type "mix help deps" for more examples and options
