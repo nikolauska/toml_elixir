@@ -1,0 +1,57 @@
+defmodule TomlElixir.Mixfile do
+  use Mix.Project
+
+  def project do
+    [
+      app: :toml_elixir,
+      version: "1.0.0",
+      elixir: "~> 1.3",
+      build_embedded: Mix.env == :prod,
+      start_permanent: Mix.env == :prod,
+      dialyzer: [ignore_warnings: "dialyzer.ignore-warnings"],
+      deps: deps(),
+      package: package(),
+
+      # Docs
+      name: "Toml Elixir",
+      source_url: "https://github.com/nikolauska/toml_elixir",
+      homepage_url: "http://github.com/nikolauska/toml_elixir",
+      docs: [main: "TomlElixir"],
+
+      # Test coverage
+      test_coverage: [tool: ExCoveralls],
+      preferred_cli_env: [
+        "coveralls": :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test
+      ]
+    ]
+  end
+
+  # Configuration for the OTP application
+  # Type "mix help compile.app" for more information
+  def application do
+    []
+  end
+
+  defp package do
+    [
+      files: ["mix.exs", "lib", "README.md", "CONTRIBUTING.md", "LICENSE.md"],
+      maintainers: ["Niko Lehtovirta"],
+      licenses: ["MIT"],
+      links: %{
+        "Github" => "https://github.com/nikolauska/toml_elixir"
+      }
+    ]
+  end
+
+  # Type "mix help deps" for more examples and options
+  defp deps do
+    [
+      {:dialyxir, "~> 0.5", only: :dev, runtime: false},
+      {:credo, "~> 0.7.3", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.14", only: :dev, runtime: false},
+      {:excoveralls, "~> 0.5.7", only: :test, runtime: false},
+    ]
+  end
+end
