@@ -16,4 +16,5 @@ after_success:
   - MIX_ENV=test mix coveralls.travis
 cache:
   directories:
-    - .dialyzer
+    - _build
+    - deps
