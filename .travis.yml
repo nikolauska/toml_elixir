@@ -9,6 +9,9 @@ script:
   - mix test
   - mix dialyzer
   - mix credo --strict
+after_script:
+  - MIX_ENV=docs mix deps.get
+  - MIX_ENV=docs mix inch.report
 after_success:
   - MIX_ENV=test mix coveralls.travis
 cache:
