@@ -1,5 +1,7 @@
 # TomlElixir
 
+[![Build Status](https://travis-ci.org/nikolauska/toml_elixir.svg?branch=master)](https://travis-ci.org/nikolauska/toml_elixir)
+
 [TOML](https://github.com/toml-lang/toml) parser for elixir.
 
 ## Installation
