@@ -8,7 +8,7 @@ defmodule TomlElixir.Mixfile do
       elixir: "~> 1.3",
       build_embedded: Mix.env == :prod,
       start_permanent: Mix.env == :prod,
-      dialyzer: [ignore_warnings: "dialyzer.ignore-warnings"],
+      dialyzer: dialyzer(),
       deps: deps(),
       package: package(),
       description: description(),
@@ -26,6 +26,13 @@ defmodule TomlElixir.Mixfile do
         "coveralls.detail": :test,
         "coveralls.post": :test
       ]
+    ]
+  end
+
+  # Dialyzer settings
+  def dialyzer do
+    [
+      ignore_warnings: "dialyzer.ignore-warnings"
     ]
   end
 
