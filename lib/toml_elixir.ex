@@ -20,6 +20,8 @@ defmodule TomlElixir do
 
   * `TomlElixir.parse/2`
   * `TomlElixir.parse!/2`
+  * `TomlElixir.parse_file/2`
+  * `TomlElixir.parse_file!/2`
   """
   @typedoc """
   Toml value is a tuple with type and actual value
@@ -133,7 +135,7 @@ defmodule TomlElixir do
   @type options :: [to_map: boolean]
 
   @doc """
-  Parse toml string to map or return raw list. Return ok/error tuple
+  Parse toml string to map or return toml tuple list.
   """
   @spec parse(binary, options) :: {:ok, map | toml_return} | {:error, String.t}
   def parse(str, opts \\ []) when is_binary(str) do
@@ -149,7 +151,7 @@ defmodule TomlElixir do
   end
 
   @doc """
-  Parse toml string to map or return raw list. Raises error on failure
+  Same as `parse/2`, but raises error on failure
   """
   @spec parse!(binary, options) :: map | toml_return
   def parse!(str, opts \\ []) when is_binary(str) do
@@ -160,7 +162,7 @@ defmodule TomlElixir do
   end
 
   @doc """
-  Parse toml file, uses same options as parse
+  Parse toml file, uses same options as `parse/2`
   """
   @spec parse_file(binary, options) :: {:ok, map | toml_return} | {:error, String.t}
   def parse_file(path, opts \\ []) do
@@ -171,7 +173,7 @@ defmodule TomlElixir do
   end
 
   @doc """
-  Same as parse_file/2, but raises error on failure
+  Same as `parse_file/2`, but raises error on failure
   """
   @spec parse_file!(binary, options) :: map | toml_return
   def parse_file!(path, opts \\ []) do
@@ -194,7 +196,7 @@ defmodule TomlElixir do
     end
   end
 
-
+  # Tokenize toml file
   @spec lexer(binary) :: {:ok, list} | {:error, String.t}
   defp lexer(str) when is_binary(str) do
     str
@@ -203,6 +205,7 @@ defmodule TomlElixir do
     |> erl_result_parse()
   end
 
+  # Parse tokens to tuples
   @spec parser(list) :: {:ok, list} | {:error, String.t}
   defp parser(tokens) when is_list(tokens) do
     tokens
@@ -210,6 +213,7 @@ defmodule TomlElixir do
     |> erl_result_parse()
   end
 
+  # Parses errors from lexer or parser
   @spec erl_result_parse({:ok, [any], any} | {:ok, [any]} |
                          {:error, {number, any, binary}} |
                          {:error, {number, any, {atom, binary}, any}}) ::
@@ -223,7 +227,7 @@ defmodule TomlElixir do
   defp erl_result_parse({:error, {line, _, {err, msg}}, _}),
     do: {:error, "Error on line #{line}: #{err} #{msg}"}
 
-  
+  # Turn toml tuple list to map
   @spec to_map(toml_return) :: map
   @spec to_map(toml_return, [] | [any] | map) :: map
   defp to_map(val),
@@ -243,6 +247,7 @@ defmodule TomlElixir do
   defp to_map([], map),
     do: map
 
+  # Turn group tuple to map
   @spec group([toml_ident], [toml_key_val], [any] | map) :: map | [any]
   defp group(idents, values, []),
     do: [group(idents, values, %{})]
@@ -253,12 +258,14 @@ defmodule TomlElixir do
   defp group([], values, map),
     do: to_map(values, map)
 
+  # Turn multi tuple to map
   @spec multi([toml_ident], [toml_key_val], map) :: map
   defp multi([{:identifier, key} | []], values, map),
     do: put(map, key, to_map(values, insert_end(map, key, %{})))
   defp multi([{:identifier, key} | tail], values, map),
     do: put(map, key, multi(tail, values, get(map, key, %{})))
 
+  # Parse value from toml value tuple
   @spec value(toml_value | [toml_value]) :: any
   defp value([]), do: []
   defp value([head | tail]), do: [value(head) | value(tail)]
@@ -267,14 +274,17 @@ defmodule TomlElixir do
   defp value({:number, val}), do: val
   defp value({:boolean, val}), do: val
 
+  # Add value to end of the list
   @spec insert_end(map, binary, any) :: [map]
   defp insert_end(map, key, value),
     do: List.insert_at(get(map, key, []), -1, value)
 
+  # Get value from map
   @spec get(map, binary, any) :: any
   defp get(map, key, default),
     do: Map.get(map, "#{key}", default)
 
+  # Put value to map
   @spec put(map, binary, any) :: map
   defp put(map, key, value),
     do: Map.put(map, "#{key}", value)
