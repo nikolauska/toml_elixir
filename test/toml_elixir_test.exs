@@ -2,9 +2,18 @@ defmodule TomlElixirTest do
   use ExUnit.Case
   #doctest TomlElixir
 
+  test "options" do
+    assert {:ok, %{}} = TomlElixir.parse("")
+    assert {:ok, %{}} = TomlElixir.parse("", to_map: true)
+    assert {:ok, []} = TomlElixir.parse("", to_map: false)
+
+    # TODO Deprecate
+    assert {:ok, []} = TomlElixir.parse("", no_parse: true)
+    assert {:ok, %{}} = TomlElixir.parse("", no_parse: false)
+  end
+
   test "example toml" do
-    toml = File.read!("./test/toml/example.toml")
-    {:ok, parsed} = TomlElixir.parse(toml)
+    {:ok, parsed} = TomlElixir.parse_file("test/toml/example.toml")
 
     assert is_map(parsed)
     assert parsed["title"] == "TOML Example"
@@ -30,8 +39,7 @@ defmodule TomlElixirTest do
   end
 
   test "hard toml" do
-    toml = File.read!("./test/toml/hard.toml")
-    {:ok, parsed} = TomlElixir.parse(toml)
+    {:ok, parsed} = TomlElixir.parse_file("test/toml/hard.toml")
 
     assert is_map(parsed)
     assert is_binary(parsed["the"]["test_string"])
@@ -46,8 +54,7 @@ defmodule TomlElixirTest do
   end
 
   test "fruit toml" do
-    toml = File.read!("./test/toml/fruit.toml")
-    parsed = TomlElixir.parse!(toml, no_parse: false)
+    parsed = TomlElixir.parse_file!("test/toml/fruit.toml")
 
     blah = parsed["fruit"]["blah"]
 
@@ -61,12 +68,12 @@ defmodule TomlElixirTest do
   end
 
   test "invalid toml" do
-    lexer = File.read!("./test/toml/invalid_lexer.toml")
-    assert catch_error(TomlElixir.parse!(lexer))
-    assert {:error, _} = TomlElixir.parse(lexer)
+    lexer = "test/toml/invalid_lexer.toml"
+    assert catch_error(TomlElixir.parse_file!(lexer))
+    assert {:error, _} = TomlElixir.parse_file(lexer)
 
-    parser = File.read!("./test/toml/invalid_parser.toml")
-    assert catch_error(TomlElixir.parse!(parser))
-    assert {:error, _} = TomlElixir.parse(parser)
+    parser = "test/toml/invalid_parser.toml"
+    assert catch_error(TomlElixir.parse_file!(parser))
+    assert {:error, _} = TomlElixir.parse_file(parser)
   end
 end
