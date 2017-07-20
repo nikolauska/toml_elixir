@@ -13,6 +13,6 @@ dependencies in `mix.exs`:
 
 ```elixir
 def deps do
-  [{:toml_elixir, "~> 1.0.0"}]
+  [{:toml_elixir, "~> 1.1.0"}]
 end
 ```
