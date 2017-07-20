@@ -138,6 +138,11 @@ defmodule TomlElixir do
 
   @doc """
   Parse toml string to map or return toml tuple list.
+
+  ## Example
+  ```
+  TomlElixir.parse("toml = true")
+  ```
   """
   @spec parse(binary, options) :: {:ok, result} | {:error, String.t}
   def parse(str, opts \\ []) when is_binary(str) do
@@ -154,6 +159,11 @@ defmodule TomlElixir do
 
   @doc """
   Same as `parse/2`, but raises error on failure
+
+  ## Example
+  ```
+  TomlElixir.parse!("toml = true")
+  ```
   """
   @spec parse!(binary, options) :: result
   def parse!(str, opts \\ []) when is_binary(str) do
@@ -165,6 +175,11 @@ defmodule TomlElixir do
 
   @doc """
   Parse toml file, uses same options as `parse/2`
+
+  ## Example
+  ```
+  TomlElixir.parse_file("path/to/example.toml")
+  ```
   """
   @spec parse_file(binary, options) :: {:ok, result} | {:error, String.t}
   def parse_file(path, opts \\ []) do
@@ -176,6 +191,11 @@ defmodule TomlElixir do
 
   @doc """
   Same as `parse_file/2`, but raises error on failure
+
+  ## Example
+  ```
+  TomlElixir.parse_file!("path/to/example.toml")
+  ```
   """
   @spec parse_file!(binary, options) :: result
   def parse_file!(path, opts \\ []) do
