@@ -4,7 +4,7 @@ defmodule TomlElixir.Mixfile do
   def project do
     [
       app: :toml_elixir,
-      version: "1.0.0",
+      version: "1.1.0",
       elixir: "~> 1.3",
       build_embedded: Mix.env == :prod,
       start_permanent: Mix.env == :prod,
@@ -63,7 +63,7 @@ defmodule TomlElixir.Mixfile do
   defp deps do
     [
       {:dialyxir, "~> 0.5", only: :dev, runtime: false},
-      {:credo, "~> 0.7.3", only: :dev, runtime: false},
+      {:credo, "~> 0.8.3", only: :dev, runtime: false},
       {:ex_doc, "~> 0.14", only: :dev, runtime: false},
       {:excoveralls, "~> 0.5.7", only: :test, runtime: false},
       {:inch_ex, only: :docs}

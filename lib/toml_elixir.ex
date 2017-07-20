@@ -134,10 +134,12 @@ defmodule TomlElixir do
 
   @type options :: [to_map: boolean]
 
+  @type result :: map | toml_return
+
   @doc """
   Parse toml string to map or return toml tuple list.
   """
-  @spec parse(binary, options) :: {:ok, map | toml_return} | {:error, String.t}
+  @spec parse(binary, options) :: {:ok, result} | {:error, String.t}
   def parse(str, opts \\ []) when is_binary(str) do
     with {:ok, tokens} <- lexer(str),
          {:ok, list} <- parser(tokens)
@@ -153,7 +155,7 @@ defmodule TomlElixir do
   @doc """
   Same as `parse/2`, but raises error on failure
   """
-  @spec parse!(binary, options) :: map | toml_return
+  @spec parse!(binary, options) :: result
   def parse!(str, opts \\ []) when is_binary(str) do
     case parse(str, opts) do
       {:ok, map} -> map
@@ -164,7 +166,7 @@ defmodule TomlElixir do
   @doc """
   Parse toml file, uses same options as `parse/2`
   """
-  @spec parse_file(binary, options) :: {:ok, map | toml_return} | {:error, String.t}
+  @spec parse_file(binary, options) :: {:ok, result} | {:error, String.t}
   def parse_file(path, opts \\ []) do
     with {:ok, str} <- File.read(path)
     do
@@ -175,7 +177,7 @@ defmodule TomlElixir do
   @doc """
   Same as `parse_file/2`, but raises error on failure
   """
-  @spec parse_file!(binary, options) :: map | toml_return
+  @spec parse_file!(binary, options) :: result
   def parse_file!(path, opts \\ []) do
     case parse_file(path, opts) do
       {:ok, toml} -> toml
