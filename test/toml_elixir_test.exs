@@ -6,10 +6,15 @@ defmodule TomlElixirTest do
     assert {:ok, %{}} = TomlElixir.parse("")
     assert {:ok, %{}} = TomlElixir.parse("", to_map: true)
     assert {:ok, []} = TomlElixir.parse("", to_map: false)
+    assert %{} = TomlElixir.parse!("")
+    assert %{} = TomlElixir.parse!("", to_map: true)
+    assert [] = TomlElixir.parse!("", to_map: false)
 
     # TODO Deprecate
     assert {:ok, []} = TomlElixir.parse("", no_parse: true)
     assert {:ok, %{}} = TomlElixir.parse("", no_parse: false)
+    assert [] = TomlElixir.parse!("", no_parse: true)
+    assert %{} = TomlElixir.parse!("", no_parse: false)
   end
 
   test "example toml" do
@@ -71,9 +76,18 @@ defmodule TomlElixirTest do
     lexer = "test/toml/invalid_lexer.toml"
     assert catch_error(TomlElixir.parse_file!(lexer))
     assert {:error, _} = TomlElixir.parse_file(lexer)
+    assert catch_error(TomlElixir.parse!(File.read!(lexer)))
+    assert {:error, _} = TomlElixir.parse(File.read!(lexer))
 
     parser = "test/toml/invalid_parser.toml"
     assert catch_error(TomlElixir.parse_file!(parser))
     assert {:error, _} = TomlElixir.parse_file(parser)
+    assert catch_error(TomlElixir.parse!(File.read!(parser)))
+    assert {:error, _} = TomlElixir.parse(File.read!(parser))
+  end
+
+  test "invalid file" do
+    assert {:error, _} = TomlElixir.parse_file("/not/valid")
+    assert catch_error(TomlElixir.parse_file!("/not/valid"))
   end
 end
