@@ -5,7 +5,7 @@ defmodule TomlElixir.Mixfile do
     [
       app: :toml_elixir,
       version: "1.1.0",
-      elixir: "~> 1.4",
+      elixir: "~> 1.3.4",
       build_embedded: Mix.env == :prod,
       start_permanent: Mix.env == :prod,
       dialyzer: dialyzer(),
