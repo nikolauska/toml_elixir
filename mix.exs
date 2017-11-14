@@ -66,6 +66,7 @@ defmodule TomlElixir.Mixfile do
       {:credo, "~> 0.8.8", only: :dev, runtime: false},
       {:ex_doc, "~> 0.18.1", only: :dev, runtime: false},
       {:excoveralls, "~> 0.7.4", only: :test, runtime: false},
+      {:poison, "~> 3.1.0", only: :test, runtime: false},
       {:inch_ex, "~> 0.5.6", only: :docs}
     ]
   end
