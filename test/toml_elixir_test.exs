@@ -20,6 +20,10 @@ defmodule TomlElixirTest do
     assert %{} = TomlElixir.parse!("", no_parse: false)
   end
 
+  test "without newline" do
+    assert {:ok, %{"toml" => true}} = TomlElixir.parse("toml = true")
+  end
+
   test "valid toml files" do
     files =
       @valid
