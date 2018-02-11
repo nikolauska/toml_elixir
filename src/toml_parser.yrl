@@ -1,55 +1,103 @@
-%% -*- mode: erlang -*-
-
 Nonterminals
-hash_groups group keygroup multigroup group_values multi_values value nls
-array elements element_value.
+  toml
+  root_section section_list
+  section section_name section_body
+  key value key_value
+  array value_list nls maybe_space
+  inline_table inline_kv_list
+.
 
 Terminals
-identifier string number datetime boolean
-'[[' ']]' '[' ']' '=' ',' '.' nl.
+  '[' ']' '{' '}'
+  '.' '=' ','
+  nl space
+  datetime_tz local_datetime local_date local_time
+  bool key_float float key_integer integer bare_key
+  basic_string literal_string
+  basic_string_ml literal_string_ml
+.
 
-Rootsymbol
-hash_groups.
+Rootsymbol toml.
 
-hash_groups -> group_values : '$1'.
-hash_groups -> hash_groups group : '$1' ++ ['$2'].
-hash_groups -> nl hash_groups : '$2'.
+toml -> root_section              : '$1'.
+toml -> root_section section_list : lists:flatten(['$1', lists:reverse('$2')]).
+toml ->              section_list : lists:flatten(lists:reverse('$1')).
 
-group_values -> '$empty' : [].
-group_values -> group_values identifier '=' value nl : '$1' ++ [{'$2', '$4'}].
-group_values -> group_values nl : '$1'.
+root_section -> section_body : lists:reverse('$1').
 
-multi_values -> '$empty' : [].
-multi_values -> multi_values identifier '=' value nl : '$1' ++ [{'$2', '$4'}].
-multi_values -> multi_values nl : '$1'.
+section_list -> section : ['$1'].
+section_list -> section_list section : ['$2' | '$1'].
 
-group -> '[' keygroup ']' nl group_values : {group, '$2', '$5'}.
-group -> '[[' multigroup ']]' nl multi_values : {multi, '$2', '$5'}.
+section -> maybe_space '[' section_name maybe_space ']' nl section_body :
+  [{table, lists:reverse('$3')} | lists:reverse('$7')].
+section -> maybe_space '[' '[' section_name maybe_space ']' ']' nl section_body :
+  [{array_table, lists:reverse('$4')} | lists:reverse('$9')].
 
-keygroup -> value : ['$1'].
-keygroup -> keygroup '.' value : '$1' ++ ['$3'].
+section_name -> key : ['$1'].
+section_name -> section_name '.' key : ['$3' | '$1'].
 
-multigroup -> value : ['$1'].
-multigroup -> multigroup '.' value : '$1' ++ ['$3'].
+section_body -> nl : [].
+section_body -> key_value nl : ['$1'].
+section_body -> section_body nl : '$1'.
+section_body -> section_body key_value nl : ['$2' | '$1'].
 
-value -> identifier : '$1'.
-value -> string : '$1'.
-value -> number : '$1'.
-value -> datetime : '$1'.
-value -> boolean : '$1'.
-value -> array : '$1'.
+key_value -> key '=' value : {{key, '$1'}, '$3'}.
 
-array -> '[' elements ']' : '$2'.
+key -> basic_string : value('$1').
+key -> bare_key     : value('$1').
+key -> bool         : atom_to_list(value('$1')).
+key -> key_integer  : value('$1', raw).
+key -> key_float    : value('$1', raw).
+key -> local_date   : value('$1', raw).
 
-elements -> '$empty' : [].
-elements -> element_value : ['$1'].
-elements -> element_value ',' elements : ['$1'|'$3'].
-elements -> nl elements : '$2'.
+value -> basic_string      : {string, value('$1')}.
+value -> basic_string_ml   : {string_ml, value('$1')}.
+value -> literal_string    : {literal, value('$1')}.
+value -> literal_string_ml : {literal_ml, value('$1')}.
+value -> key_integer       : value('$1', parsed).
+value -> key_float         : value('$1', parsed).
+value -> integer           : value('$1').
+value -> float             : value('$1').
+value -> bool              : value('$1').
+value -> datetime_tz       : {datetime, element(1, value('$1')), element(2, value('$1'))}.
+value -> local_datetime    : {datetime, value('$1')}.
+value -> local_date        : {date, value('$1', parsed)}.
+value -> local_time        : {time, value('$1')}.
+value -> array             : '$1'.
+value -> inline_table      : '$1'.
 
-element_value -> nls value nls: '$2'.
+%%----------------------------------------------------------
+
+array -> maybe_space '[' nls                        maybe_space ']' :
+  {array, []}.
+array -> maybe_space '[' nls value_list nls         maybe_space ']' :
+  {array, lists:reverse('$4')}.
+array -> maybe_space '[' nls value_list nls ',' nls maybe_space ']' :
+  {array, lists:reverse('$4')}.
+
+value_list -> value : ['$1'].
+value_list -> value_list nls ',' nls value : ['$5' | '$1'].
 
 nls -> '$empty'.
 nls -> nls nl.
 
+maybe_space -> '$empty'.
+maybe_space -> space.
 
-Expect 6.
+inline_table -> '{' '}' :
+  {inline_table, []}.
+inline_table -> '{' inline_kv_list '}' :
+  {inline_table, lists:reverse('$2')}.
+
+inline_kv_list -> key_value : ['$1'].
+inline_kv_list -> inline_kv_list ',' key_value : ['$3' | '$1'].
+
+Erlang code.
+
+value({_TermName, _Line, {RawValue, _ParsedValue}}, raw = _Element) ->
+  RawValue;
+value({_TermName, _Line, {_RawValue, ParsedValue}}, parsed = _Element) ->
+  ParsedValue.
+
+value({_TermName, _Line, Value}) ->
+  Value.
