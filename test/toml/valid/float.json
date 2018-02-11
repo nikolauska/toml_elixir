@@ -1,4 +1,4 @@
 {
-    "pi": {"type": "float", "value": "3.14"},
-    "negpi": {"type": "float", "value": "-3.14"}
+  "pi": 3.14,
+  "negpi": -3.14
 }

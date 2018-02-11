@@ -1,4 +1,4 @@
 {
-    "answer": {"type": "integer", "value": "42"},
-    "neganswer": {"type": "integer", "value": "-42"}
+  "answer": 42,
+  "neganswer": -42
 }

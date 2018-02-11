@@ -12,12 +12,6 @@ defmodule TomlElixirTest do
     assert %{} = TomlElixir.parse!("")
     assert %{} = TomlElixir.parse!("", to_map: true)
     assert [] = TomlElixir.parse!("", to_map: false)
-
-    # TODO Deprecate
-    assert {:ok, []} = TomlElixir.parse("", no_parse: true)
-    assert {:ok, %{}} = TomlElixir.parse("", no_parse: false)
-    assert [] = TomlElixir.parse!("", no_parse: true)
-    assert %{} = TomlElixir.parse!("", no_parse: false)
   end
 
   test "without newline" do
@@ -29,22 +23,30 @@ defmodule TomlElixirTest do
       @valid
       |> File.ls!()
       |> Enum.filter(&String.contains?(&1, ".toml"))
-      |> Enum.map(fn toml -> {toml, String.replace(toml, ".toml", ".json")} end)
+      |> Enum.map(&String.replace(&1, ".toml", ""))
 
-    for {toml_file, json_file} <- files do
-      json_path = Path.join(@valid, json_file)
+    for file <- files do
       json =
-        json_path
+        @valid
+        |> Path.join(file <> ".json")
         |> File.read!()
         |> Poison.decode!()
 
-      assert {:ok, json} == TomlElixir.parse_file(Path.join(@valid, toml_file))
+      toml_file = Path.join(@valid, file <> ".toml")
+
+      assert {{:ok, json}, file} == {TomlElixir.parse_file(toml_file), file}
     end
   end
 
   test "invalid toml files" do
-    for file <- File.ls!(@invalid) do
-      assert {:error, _} = TomlElixir.parse_file(Path.join(@invalid, file))
+    files =
+      @invalid
+      |> File.ls!()
+      |> Enum.map(&String.replace(&1, ".toml", ""))
+
+    for file <- files do
+      toml_file = Path.join(@invalid, file <> ".toml")
+      assert {{:error, _}, file} = {TomlElixir.parse_file(toml_file), file}
     end
   end
 end
