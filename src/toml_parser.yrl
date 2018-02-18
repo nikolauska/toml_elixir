@@ -28,6 +28,8 @@ root_section -> section_body : lists:reverse('$1').
 section_list -> section : ['$1'].
 section_list -> section_list section : ['$2' | '$1'].
 
+section -> maybe_space '[' section_name maybe_space ']' nl:
+  [{table, lists:reverse('$3')}].
 section -> maybe_space '[' section_name maybe_space ']' nl section_body :
   [{table, lists:reverse('$3')} | lists:reverse('$7')].
 section -> maybe_space '[' '[' section_name maybe_space ']' ']' nl section_body :
@@ -54,11 +56,11 @@ value -> basic_string      : {string, value('$1')}.
 value -> basic_string_ml   : {string_ml, value('$1')}.
 value -> literal_string    : {literal, value('$1')}.
 value -> literal_string_ml : {literal_ml, value('$1')}.
-value -> key_integer       : value('$1', parsed).
-value -> key_float         : value('$1', parsed).
-value -> integer           : value('$1').
-value -> float             : value('$1').
-value -> bool              : value('$1').
+value -> key_integer       : {integer, value('$1', parsed)}.
+value -> key_float         : {float, value('$1', parsed)}.
+value -> integer           : {integer, value('$1')}.
+value -> float             : {float, value('$1')}.
+value -> bool              : {boolean, value('$1')}.
 value -> datetime_tz       : {datetime, element(1, value('$1')), element(2, value('$1'))}.
 value -> local_datetime    : {datetime, value('$1')}.
 value -> local_date        : {date, value('$1', parsed)}.

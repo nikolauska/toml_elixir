@@ -1,72 +1,88 @@
 defmodule TomlElixir.Mapper do
-
-  @doc """
-  Parse list of values to map
+  @moduledoc """
+  Transform toml list to map format
   """
-  @spec parse(TomlElixir.toml_return) :: map
-  def parse(toml) do
-    to_map(toml)
+
+  @spec to_map(list) :: map
+  def to_map([]), do: %{}
+  def to_map(toml), do: to_map(toml, {[], %{}})
+  def to_map([], {_to, acc}), do: acc
+  def to_map([{:table, to} | _tail], {to, _acc}) do
+    throw "Error: duplicate table #{Enum.join(to, ".")}"
+  end
+  def to_map([{:table, to} | []], {_to, acc}) do
+    do_put_in(to, nil, %{}, acc)
+  end
+  def to_map([{:table, to} | tail], {_to, acc}) do
+    to_map(tail, {to, acc})
+  end
+  def to_map([{:array_table, to} | tail], {_to, acc}) do
+    to_map(tail, {to, do_put_in_new(to, acc)})
+  end
+  def to_map([{{:key, key}, {:array, val}} | tail], {to, acc}) do
+    to_map(tail, {to, do_put_in(to, key, val, acc)})
+  end
+  def to_map([{{:key, key}, {:datetime, val}} | tail], {to, acc}) do
+    to_map(tail, {to, do_put_in(to, key, val, acc)})
+  end
+  def to_map([{{:key, key}, {:date, val}} | tail], {to, acc}) do
+    to_map(tail, {to, do_put_in(to, key, val, acc)})
+  end
+  def to_map([{{:key, key}, {:time, val}} | tail], {to, acc}) do
+    to_map(tail, {to, do_put_in(to, key, val, acc)})
+  end
+  def to_map([{{:key, key}, {:string, val}} | tail], {to, acc}) do
+    to_map(tail, {to, do_put_in(to, key, val, acc)})
+  end
+  def to_map([{{:key, key}, {:string_ml, val}} | tail], {to, acc}) do
+    to_map(tail, {to, do_put_in(to, key, val, acc)})
+  end
+  def to_map([{{:key, key}, {:literal, val}} | tail], {to, acc}) do
+    to_map(tail, {to, do_put_in(to, key, val, acc)})
+  end
+  def to_map([{{:key, key}, {:literal_ml, val}} | tail], {to, acc}) do
+    to_map(tail, {to, do_put_in(to, key, val, acc)})
+  end
+  def to_map([{{:key, key}, val} | tail], {to, acc}) do
+    to_map(tail, {to, do_put_in(to, key, val, acc)})
   end
 
-  # Turn toml tuple list to map
-  @spec to_map(TomlElixir.toml_return) :: map
-  @spec to_map(TomlElixir.toml_return, [] | [any] | map) :: map
-  defp to_map(val),
-    do: to_map(val, %{})
-  defp to_map(val, []),
-    do: [to_map(val, %{})]
-  defp to_map(val, list) when is_list(list),
-    do: List.update_at(list, -1, &(to_map(val, &1)))
-  defp to_map([{:group, idents, values} | tail], map),
-    do: to_map(tail, group(idents, values, map))
-  defp to_map([{:multi, idents, values} | tail], map),
-    do: to_map(tail, multi(idents, values, map))
-  defp to_map([{{:identifier, key}, values} | tail], map) when is_list(values),
-    do: to_map(tail, put(map, key, value(values)))
-  defp to_map([{{:identifier, key}, val} | tail], map),
-    do: to_map(tail, put(map, key, value(val)))
-  defp to_map([], map),
-    do: map
+  defp do_put_in([], key, val, []) do
+    [Map.put(%{}, key, val)]
+  end
+  defp do_put_in([], key, val, acc) when is_list(acc) do
+    List.update_at(acc, -1, &Map.put(&1, key, val))
+  end
+  defp do_put_in([], key, val, acc) when is_map(acc) do
+    if Map.has_key?(acc, key) do
+      throw "Error: duplicate key #{key}"
+    else
+      Map.put(acc, key, val)
+    end
+  end
+  defp do_put_in([key], nil, val, acc) when is_map(acc) do
+    Map.put(acc, key, val)
+  end
+  defp do_put_in(to, key, val, acc) when is_list(acc) do
+    List.update_at(acc, -1, &do_put_in(to, key, val, &1))
+  end
+  defp do_put_in([head | tail], key, val, acc) when is_map(acc) do
+    Map.put(acc, head, do_put_in(tail, key, val, Map.get(acc, head, %{})))
+  end
+  defp do_put_in(_to, _key, _val, acc) do
+    throw "Error: invalid type #{inspect acc}, should be map"
+  end
 
-  # Turn group tuple to map
-  @spec group([TomlElixir.toml_ident], [TomlElixir.toml_key_val], [any] | map) :: map | [any]
-  defp group(idents, values, []),
-    do: [group(idents, values, %{})]
-  defp group(idents, values, list) when is_list(list),
-    do: List.update_at(list, -1, &group(idents, values, &1))
-  defp group([{:identifier, key} | tail], values, map),
-    do: put(map, key, group(tail, values, get(map, key, %{})))
-  defp group([], values, map),
-    do: to_map(values, map)
-
-  # Turn multi tuple to map
-  @spec multi([TomlElixir.toml_ident], [TomlElixir.toml_key_val], map) :: map
-  defp multi([{:identifier, key} | []], values, map),
-    do: put(map, key, to_map(values, insert_end(map, key, %{})))
-  defp multi([{:identifier, key} | tail], values, map),
-    do: put(map, key, multi(tail, values, get(map, key, %{})))
-
-  # Parse value from toml value tuple
-  @spec value(TomlElixir.toml_value | [TomlElixir.toml_value]) :: any
-  defp value([]), do: []
-  defp value([head | tail]), do: [value(head) | value(tail)]
-  defp value({:string, val}), do: "#{val}"
-  defp value({:datetime, val}), do: val
-  defp value({:number, val}), do: val
-  defp value({:boolean, val}), do: val
-
-  # Add value to end of the list
-  @spec insert_end(map, binary, any) :: [map]
-  defp insert_end(map, key, value),
-    do: List.insert_at(get(map, key, []), -1, value)
-
-  # Get value from map
-  @spec get(map, binary, any) :: any
-  defp get(map, key, default),
-    do: Map.get(map, "#{key}", default)
-
-  # Put value to map
-  @spec put(map, binary, any) :: map
-  defp put(map, key, value),
-    do: Map.put(map, "#{key}", value)
+  defp do_put_in_new([], acc) when is_list(acc) do
+    List.insert_at(acc, -1, %{})
+  end
+  defp do_put_in_new([], acc) when is_map(acc) do
+    [%{}]
+  end
+  defp do_put_in_new(to, acc) when is_list(acc) do
+    List.update_at(acc, -1, &do_put_in_new(to, &1))
+  end
+  defp do_put_in_new([head | tail], acc) when is_map(acc) do
+    Map.put(acc, head, do_put_in_new(tail, Map.get(acc, head, %{})))
+  end
 end

@@ -5,17 +5,22 @@ defmodule TomlElixirTest do
   @valid Path.join(["test", "toml", "valid"])
   @invalid Path.join(["test", "toml", "invalid"])
 
-  test "options" do
-    assert {:ok, %{}} = TomlElixir.parse("")
-    assert {:ok, %{}} = TomlElixir.parse("", to_map: true)
-    assert {:ok, []} = TomlElixir.parse("", to_map: false)
-    assert %{} = TomlElixir.parse!("")
-    assert %{} = TomlElixir.parse!("", to_map: true)
-    assert [] = TomlElixir.parse!("", to_map: false)
-  end
-
   test "without newline" do
     assert {:ok, %{"toml" => true}} = TomlElixir.parse("toml = true")
+  end
+
+  test "test ! parsers" do
+    toml_file = Path.join(@valid, "bool.toml")
+    assert %{"f" => false, "t" => true} = TomlElixir.parse!(File.read!(toml_file))
+    assert %{"f" => false, "t" => true} = TomlElixir.parse_file!(toml_file)
+
+    assert_raise File.Error, fn ->
+      TomlElixir.parse_file!(toml_file <> "a")
+    end
+
+    assert_raise TomlElixir.Error, fn ->
+      TomlElixir.parse!("a =")
+    end
   end
 
   test "valid toml files" do
@@ -46,7 +51,7 @@ defmodule TomlElixirTest do
 
     for file <- files do
       toml_file = Path.join(@invalid, file <> ".toml")
-      assert {{:error, _}, file} = {TomlElixir.parse_file(toml_file), file}
+      assert {{:error, _}, ^file} = {TomlElixir.parse_file(toml_file), file}
     end
   end
 end

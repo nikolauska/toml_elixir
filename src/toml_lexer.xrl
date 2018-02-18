@@ -133,9 +133,8 @@ local_time(String) ->
   case string:tokens(SS, ".") of
     [_] ->
       {list_to_integer(HH), list_to_integer(MM), list_to_integer(SS)};
-    [S, _Frac] ->
-      % TODO: encode `Frac'
-      {list_to_integer(HH), list_to_integer(MM), list_to_integer(S)}
+    [S, Frac] ->
+      {{list_to_integer(HH), list_to_integer(MM), list_to_integer(S)}, Frac}
   end.
 
 literal_string(String) ->
