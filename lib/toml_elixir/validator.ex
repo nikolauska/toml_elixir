@@ -2,6 +2,7 @@ defmodule TomlElixir.Validator do
   @moduledoc """
   Parse and validate toml returned by parse
   """
+  alias TomlElixir.Error
 
   @doc """
   Validate toml and parse it to proper format
@@ -91,10 +92,10 @@ defmodule TomlElixir.Validator do
     [value | array(tail, :boolean)]
   end
   defp array([{found, _, _} | _tail], type) do
-    throw "Array value should be #{type}, found #{found}"
+    throw Error.exception("Array value should be #{type}, found #{found}")
   end
   defp array([{found, _} | _tail], type) do
-    throw "Array value should be #{type}, found #{found}"
+    throw Error.exception("Array value should be #{type}, found #{found}")
   end
 
   @spec datetime(:calendar.datetime, binary) :: String.t

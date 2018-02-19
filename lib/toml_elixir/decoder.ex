@@ -1,11 +1,13 @@
 defmodule TomlElixir.Decoder do
   @moduledoc """
-  Decode toml
+  Module for decoding TOML file to map format
   """
   alias TomlElixir.{Validator, Mapper, Error}
 
-  @doc false
-  @spec decode(String.t, TomlElixir.options) :: {:ok, map} | {:error, String.t}
+  @doc """
+  Decode TOML string to map format
+  """
+  @spec decode(String.t, TomlElixir.options) :: {:ok, map} | {:error, Exception.t}
   def decode(str, _opts) do
     str = add_newline(str)
     with {:ok, tokens} <- lexer(str),
@@ -16,13 +18,10 @@ defmodule TomlElixir.Decoder do
         |> Validator.validate()
         |> Mapper.to_map()
       {:ok, toml}
-    else
-      {:error, reason} ->
-        {:error, Error.exception(reason, str)}
     end
   catch
-    reason when is_binary(reason) ->
-      {:error, Error.exception(reason, str)}
+    exception ->
+      {:error, exception}
   end
 
   # Tokenizer fails if there are no newline
@@ -60,6 +59,6 @@ defmodule TomlElixir.Decoder do
                     {:ok, [any]} | {:error, String.t}
   defp erl_result({:ok, tokens, _}), do: {:ok, tokens}
   defp erl_result({:ok, list}), do: {:ok, list}
-  defp erl_result({:error, {_line, _, err}}), do: {:error, "Error: #{err}"}
-  defp erl_result({:error, {_line, _, {err, msg}}, _}), do: {:error, "#{err} #{msg}"}
+  defp erl_result({:error, {_line, _, err}}), do: {:error, Error.exception(err)}
+  defp erl_result({:error, {_line, _, {err, _msg}}, _}), do: {:error, Error.exception(err)}
 end

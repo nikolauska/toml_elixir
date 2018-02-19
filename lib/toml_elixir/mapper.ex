@@ -1,14 +1,18 @@
 defmodule TomlElixir.Mapper do
   @moduledoc """
-  Transform toml list to map format
+  Module for transforming toml list to map format
   """
+  alias TomlElixir.Error
 
+  @doc """
+  Transform TOML list to map format
+  """
   @spec to_map(list) :: map
   def to_map([]), do: %{}
   def to_map(toml), do: to_map(toml, {[], %{}})
   def to_map([], {_to, acc}), do: acc
   def to_map([{:table, to} | _tail], {to, _acc}) do
-    throw "Error: duplicate table #{Enum.join(to, ".")}"
+    throw Error.exception("Duplicate table #{Enum.join(to, ".")}")
   end
   def to_map([{:table, to} | []], {_to, acc}) do
     do_put_in(to, nil, %{}, acc)
@@ -55,7 +59,7 @@ defmodule TomlElixir.Mapper do
   end
   defp do_put_in([], key, val, acc) when is_map(acc) do
     if Map.has_key?(acc, key) do
-      throw "Error: duplicate key #{key}"
+      throw Error.exception("Duplicate key #{key}")
     else
       Map.put(acc, key, val)
     end
@@ -70,14 +74,17 @@ defmodule TomlElixir.Mapper do
     Map.put(acc, head, do_put_in(tail, key, val, Map.get(acc, head, %{})))
   end
   defp do_put_in(_to, _key, _val, acc) do
-    throw "Error: invalid type #{inspect acc}, should be map"
+    throw Error.exception("Invalid type #{inspect acc}, should be map")
   end
 
   defp do_put_in_new([], acc) when is_list(acc) do
     List.insert_at(acc, -1, %{})
   end
-  defp do_put_in_new([], acc) when is_map(acc) do
+  defp do_put_in_new([], acc) when acc == %{} do
     [%{}]
+  end
+  defp do_put_in_new([], acc) when is_map(acc) do
+    throw Error.exception("Should be empty, but #{inspect acc} was found")
   end
   defp do_put_in_new(to, acc) when is_list(acc) do
     List.update_at(acc, -1, &do_put_in_new(to, &1))

@@ -35,7 +35,7 @@ defmodule TomlElixir do
   TomlElixir.parse("toml = true")
   ```
   """
-  @spec parse(binary, options) :: {:ok, map} | {:error, String.t}
+  @spec parse(binary, options) :: {:ok, map} | {:error, Exception.t}
   def parse(str, opts \\ []) when is_binary(str) do
     Decoder.decode(str, opts)
   end
@@ -64,7 +64,7 @@ defmodule TomlElixir do
   TomlElixir.parse_file("path/to/example.toml")
   ```
   """
-  @spec parse_file(binary, options) :: {:ok, map} | {:error, String.t}
+  @spec parse_file(binary, options) :: {:ok, map} | {:error, Exception.t}
   def parse_file(path, opts \\ []) do
     with {:ok, str} <- File.read(path)
     do
