@@ -18,8 +18,8 @@ defmodule TomlElixir.Validator do
   def validate([{{:key, key}, {:array, values}} | tail]) do
     [{{:key, to_string(key)}, {:array, array(values)}} | validate(tail)]
   end
-  def validate([{{:key, key}, {:datetime, dt, suffix}} | tail]) do
-    [{{:key, to_string(key)}, {:datetime, datetime(dt, suffix)}} | validate(tail)]
+  def validate([{{:key, key}, {:datetime, dt, tz}} | tail]) do
+    [{{:key, to_string(key)}, {:datetime, datetime(dt, tz)}} | validate(tail)]
   end
   def validate([{{:key, key}, {:datetime, dt}} | tail]) do
     [{{:key, to_string(key)}, {:datetime, datetime(dt, "")}} | validate(tail)]

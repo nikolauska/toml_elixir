@@ -7,7 +7,8 @@ defmodule TomlElixir.Decoder do
   @doc """
   Decode TOML string to map format
   """
-  @spec decode(String.t, TomlElixir.options) :: {:ok, map} | {:error, Exception.t}
+  @spec decode(String.t, TomlElixir.options) :: {:ok, map} |
+                                                {:error, Exception.t}
   def decode(str, _opts) do
     str = add_newline(str)
     with {:ok, tokens} <- lexer(str),
