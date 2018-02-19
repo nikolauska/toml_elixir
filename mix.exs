@@ -4,7 +4,7 @@ defmodule TomlElixir.Mixfile do
   def project do
     [
       app: :toml_elixir,
-      version: "1.1.0",
+      version: "2.0.0",
       elixir: ">= 1.3.4",
       build_embedded: Mix.env == :prod,
       start_permanent: Mix.env == :prod,
