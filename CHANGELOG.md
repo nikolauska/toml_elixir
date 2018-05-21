@@ -1,3 +1,7 @@
+## 2.0.1
+
+* Fixed inline table parsing
+
 ## 2.0.0
 
 * Full support for TOML 0.4.0 spec
