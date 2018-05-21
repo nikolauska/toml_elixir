@@ -18,9 +18,15 @@ defmodule TomlElixirTest do
       TomlElixir.parse_file!(toml_file <> "a")
     end
 
-    assert_raise TomlElixir.Error, fn ->
+    err = assert_raise TomlElixir.Error, fn ->
       TomlElixir.parse!("a =")
     end
+
+    assert err.reason == TomlElixir.Error.message(err)
+  end
+
+  test "invalid path" do
+    assert {:error, _} = TomlElixir.parse_file("not_found.toml")
   end
 
   test "valid toml files" do
