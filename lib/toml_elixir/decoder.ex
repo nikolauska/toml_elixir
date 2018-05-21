@@ -17,7 +17,7 @@ defmodule TomlElixir.Decoder do
       toml =
         list
         |> Validator.validate()
-        |> Mapper.to_map()
+        |> Mapper.parse()
       {:ok, toml}
     end
   catch

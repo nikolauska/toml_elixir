@@ -7,56 +7,59 @@ defmodule TomlElixir.Mapper do
   @doc """
   Transform TOML list to map format
   """
-  @spec to_map(list) :: map
-  def to_map([]), do: %{}
-  def to_map(toml), do: to_map(toml, {[], %{}})
-  def to_map([], {_to, acc}), do: acc
-  def to_map([{:table, to} | _tail], {to, _acc}) do
+  @spec parse(list) :: map
+  def parse([]), do: %{}
+  def parse(toml) when is_list(toml), do: to_map(toml, {[], %{}})
+
+  @spec to_map(list, {list, map}) :: map
+  defp to_map([], {_to, acc}), do: acc
+  defp to_map([{:table, to} | _tail], {to, _acc}) do
     throw Error.exception("Duplicate table #{Enum.join(to, ".")}")
   end
-  def to_map([{:table, to} | []], {_to, acc}) do
+  defp to_map([{:table, to} | []], {_to, acc}) do
     do_put_in(to, nil, %{}, acc)
   end
-  def to_map([{:table, to} | tail], {_to, acc}) do
+  defp to_map([{:table, to} | tail], {_to, acc}) do
     to_map(tail, {to, acc})
   end
-  def to_map([{:array_table, to} | tail], {_to, acc}) do
+  defp to_map([{:array_table, to} | tail], {_to, acc}) do
     to_map(tail, {to, do_put_in_new(to, acc)})
   end
-  def to_map([{{:key, key}, {:array, val}} | tail], {to, acc}) do
+  defp to_map([{{:key, key}, {:array, val}} | tail], {to, acc}) do
     to_map(tail, {to, do_put_in(to, key, val, acc)})
   end
-  def to_map([{{:key, key}, {:datetime, val}} | tail], {to, acc}) do
+  defp to_map([{{:key, key}, {:datetime, val}} | tail], {to, acc}) do
     to_map(tail, {to, do_put_in(to, key, val, acc)})
   end
-  def to_map([{{:key, key}, {:date, val}} | tail], {to, acc}) do
+  defp to_map([{{:key, key}, {:date, val}} | tail], {to, acc}) do
     to_map(tail, {to, do_put_in(to, key, val, acc)})
   end
-  def to_map([{{:key, key}, {:time, val}} | tail], {to, acc}) do
+  defp to_map([{{:key, key}, {:time, val}} | tail], {to, acc}) do
     to_map(tail, {to, do_put_in(to, key, val, acc)})
   end
-  def to_map([{{:key, key}, {:string, val}} | tail], {to, acc}) do
+  defp to_map([{{:key, key}, {:string, val}} | tail], {to, acc}) do
     to_map(tail, {to, do_put_in(to, key, val, acc)})
   end
-  def to_map([{{:key, key}, {:string_ml, val}} | tail], {to, acc}) do
+  defp to_map([{{:key, key}, {:string_ml, val}} | tail], {to, acc}) do
     to_map(tail, {to, do_put_in(to, key, val, acc)})
   end
-  def to_map([{{:key, key}, {:literal, val}} | tail], {to, acc}) do
+  defp to_map([{{:key, key}, {:literal, val}} | tail], {to, acc}) do
     to_map(tail, {to, do_put_in(to, key, val, acc)})
   end
-  def to_map([{{:key, key}, {:literal_ml, val}} | tail], {to, acc}) do
+  defp to_map([{{:key, key}, {:literal_ml, val}} | tail], {to, acc}) do
     to_map(tail, {to, do_put_in(to, key, val, acc)})
   end
-  def to_map([{{:key, key}, {:inline_table, val}} | tail], {to, acc}) when is_list(val) do
-    to_map(tail, {to, do_put_in(to, key, to_map(val), acc)})
+  defp to_map([{{:key, key}, {:inline_table, val}} | tail], {to, acc}) when is_list(val) do
+    to_map(tail, {to, do_put_in(to, key, parse(val), acc)})
   end
-  def to_map([{{:key, key}, val} | tail], {to, acc}) when is_list(val) do
-    to_map(tail, {to, do_put_in(to, key, to_map(val), acc)})
+  defp to_map([{{:key, key}, val} | tail], {to, acc}) when is_list(val) do
+    to_map(tail, {to, do_put_in(to, key, parse(val), acc)})
   end
-  def to_map([{{:key, key}, val} | tail], {to, acc}) do
+  defp to_map([{{:key, key}, val} | tail], {to, acc}) do
     to_map(tail, {to, do_put_in(to, key, val, acc)})
   end
 
+  @spec do_put_in(list, String.t | nil, any, list | map) :: map
   defp do_put_in([], key, val, []) do
     [Map.put(%{}, key, val)]
   end
@@ -83,6 +86,7 @@ defmodule TomlElixir.Mapper do
     throw Error.exception("Invalid type #{inspect acc}, should be map")
   end
 
+  @spec do_put_in_new(list, list | map) :: list | map
   defp do_put_in_new([], acc) when is_list(acc) do
     List.insert_at(acc, -1, %{})
   end
