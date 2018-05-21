@@ -52,9 +52,6 @@ defmodule TomlElixir.Mapper do
   defp to_map([{{:key, key}, {:inline_table, val}} | tail], {to, acc}) when is_list(val) do
     to_map(tail, {to, do_put_in(to, key, parse(val), acc)})
   end
-  defp to_map([{{:key, key}, val} | tail], {to, acc}) when is_list(val) do
-    to_map(tail, {to, do_put_in(to, key, parse(val), acc)})
-  end
   defp to_map([{{:key, key}, val} | tail], {to, acc}) do
     to_map(tail, {to, do_put_in(to, key, val, acc)})
   end
