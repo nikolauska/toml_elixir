@@ -42,6 +42,12 @@ defmodule TomlElixir.Validator do
   def validate([{{:key, key}, {:literal_ml, value}} | tail]) do
     [{{:key, to_string(key)}, {:literal_ml, "#{value}"}} | validate(tail)]
   end
+  def validate([{{:key, key}, {:inline_table, val}} | tail]) when is_list(val) do
+    [{{:key, to_string(key)}, validate(val)} | validate(tail)]
+  end
+  def validate([{{:key, key}, val} | tail]) when is_list(val) do
+    [{{:key, to_string(key)}, validate(val)} | validate(tail)]
+  end
   def validate([{{:key, key}, {_, value}} | tail]) do
     [{{:key, to_string(key)}, value} | validate(tail)]
   end

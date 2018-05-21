@@ -47,6 +47,12 @@ defmodule TomlElixir.Mapper do
   def to_map([{{:key, key}, {:literal_ml, val}} | tail], {to, acc}) do
     to_map(tail, {to, do_put_in(to, key, val, acc)})
   end
+  def to_map([{{:key, key}, {:inline_table, val}} | tail], {to, acc}) when is_list(val) do
+    to_map(tail, {to, do_put_in(to, key, to_map(val), acc)})
+  end
+  def to_map([{{:key, key}, val} | tail], {to, acc}) when is_list(val) do
+    to_map(tail, {to, do_put_in(to, key, to_map(val), acc)})
+  end
   def to_map([{{:key, key}, val} | tail], {to, acc}) do
     to_map(tail, {to, do_put_in(to, key, val, acc)})
   end
