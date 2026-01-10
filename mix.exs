@@ -12,6 +12,7 @@ defmodule TomlElixir.Mixfile do
       deps: deps(),
       package: package(),
       description: description(),
+      cli: cli(),
 
       # Docs
       name: "Toml Elixir",
@@ -36,10 +37,11 @@ defmodule TomlElixir.Mixfile do
 
   def cli do
     [
-      preferred_cli_env: [
+      preferred_envs: [
         coveralls: :test,
         "coveralls.detail": :test,
-        "coveralls.post": :test
+        "coveralls.post": :test,
+        "coveralls.html": :test
       ]
     ]
   end
@@ -71,7 +73,7 @@ defmodule TomlElixir.Mixfile do
   defp deps do
     [
       {:ex_doc, "~> 0.39", only: :dev, runtime: false},
-      {:excoveralls, "~> 0.18", only: :test, runtime: false},
+      {:excoveralls, "~> 0.18", only: [:dev, :test], runtime: false},
       {:styler, "~> 1.10", only: [:dev, :test], runtime: false},
       {:tidewave, "~> 0.4", only: :dev},
       {:bandit, "~> 1.0", only: :dev}
