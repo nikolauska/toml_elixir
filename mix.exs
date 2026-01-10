@@ -50,7 +50,7 @@ defmodule TomlElixir.Mixfile do
 
   defp package do
     [
-      files: ["mix.exs", "lib", "src", "README.md", "LICENSE.md"],
+      files: ["mix.exs", "lib", "README.md", "LICENSE.md"],
       maintainers: ["Niko Lehtovirta"],
       licenses: ["MIT"],
       links: %{
