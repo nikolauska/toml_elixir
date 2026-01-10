@@ -8,7 +8,6 @@ defmodule TomlElixir.Mixfile do
       elixir: ">= 1.18.0",
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,
-      dialyzer: dialyzer(),
       deps: deps(),
       package: package(),
       description: description(),
@@ -29,13 +28,6 @@ defmodule TomlElixir.Mixfile do
       aliases: [
         tidewave: "run --no-halt -e 'Agent.start(fn -> Bandit.start_link(plug: Tidewave, port: 4000) end)'"
       ]
-    ]
-  end
-
-  # Dialyzer settings
-  def dialyzer do
-    [
-      ignore_warnings: "dialyzer.ignore-warnings"
     ]
   end
 
