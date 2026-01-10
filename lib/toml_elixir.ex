@@ -20,6 +20,8 @@ defmodule TomlElixir do
 
   * `TomlElixir.decode/2`
   * `TomlElixir.decode!/2`
+  * `TomlElixir.encode/2`
+  * `TomlElixir.encode!/2`
   """
 
   @type options :: map | keyword
@@ -52,6 +54,37 @@ defmodule TomlElixir do
   def decode!(str, opts \\ []) when is_binary(str) do
     case decode(str, opts) do
       {:ok, map} -> map
+      {:error, err} -> raise err
+    end
+  end
+
+  @doc """
+  Encode map to toml string.
+
+  ## Example
+  ```
+  TomlElixir.encode(%{a: 1})
+  ```
+  """
+  @spec encode(map, options) :: {:ok, binary} | {:error, any}
+  def encode(map, opts \\ []) when is_map(map) do
+    TomlElixir.Encoder.encode(map, opts)
+  rescue
+    e -> {:error, e}
+  end
+
+  @doc """
+  Same as `encode/2`, but raises error on failure.
+
+  ## Example
+  ```
+  TomlElixir.encode!(%{a: 1})
+  ```
+  """
+  @spec encode!(map, options) :: binary
+  def encode!(map, opts \\ []) when is_map(map) do
+    case encode(map, opts) do
+      {:ok, str} -> str
       {:error, err} -> raise err
     end
   end
