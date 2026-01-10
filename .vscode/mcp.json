@@ -1,0 +1,9 @@
+{
+	"servers": {
+		"tidevawe": {
+			"url": "http://localhost:4000",
+			"type": "http"
+		}
+	},
+	"inputs": []
+}

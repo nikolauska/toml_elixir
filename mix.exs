@@ -5,9 +5,9 @@ defmodule TomlElixir.Mixfile do
     [
       app: :toml_elixir,
       version: "2.0.1",
-      elixir: ">= 1.3.4",
-      build_embedded: Mix.env == :prod,
-      start_permanent: Mix.env == :prod,
+      elixir: ">= 1.18.0",
+      build_embedded: Mix.env() == :prod,
+      start_permanent: Mix.env() == :prod,
       dialyzer: dialyzer(),
       deps: deps(),
       package: package(),
@@ -21,10 +21,8 @@ defmodule TomlElixir.Mixfile do
 
       # Test coverage
       test_coverage: [tool: ExCoveralls],
-      preferred_cli_env: [
-        "coveralls": :test,
-        "coveralls.detail": :test,
-        "coveralls.post": :test
+      aliases: [
+        tidewave: "run --no-halt -e 'Agent.start(fn -> Bandit.start_link(plug: Tidewave, port: 4000) end)'"
       ]
     ]
   end
@@ -33,6 +31,16 @@ defmodule TomlElixir.Mixfile do
   def dialyzer do
     [
       ignore_warnings: "dialyzer.ignore-warnings"
+    ]
+  end
+
+  def cli do
+    [
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test
+      ]
     ]
   end
 
@@ -62,12 +70,11 @@ defmodule TomlElixir.Mixfile do
   # Type "mix help deps" for more examples and options
   defp deps do
     [
-      {:dialyxir, "~> 0.5.1", only: :dev, runtime: false},
-      {:credo, "~> 0.8.8", only: :dev, runtime: false},
-      {:ex_doc, "~> 0.18.1", only: :dev, runtime: false},
-      {:excoveralls, "~> 0.7.4", only: :test, runtime: false},
-      {:poison, "~> 3.0", only: [:test, :docs], runtime: false},
-      {:inch_ex, "~> 0.5.6", only: :docs}
+      {:ex_doc, "~> 0.39", only: :dev, runtime: false},
+      {:excoveralls, "~> 0.18", only: :test, runtime: false},
+      {:styler, "~> 1.10", only: [:dev, :test], runtime: false},
+      {:tidewave, "~> 0.4", only: :dev},
+      {:bandit, "~> 1.0", only: :dev}
     ]
   end
 end
