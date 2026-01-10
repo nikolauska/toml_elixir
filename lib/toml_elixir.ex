@@ -16,74 +16,43 @@ defmodule TomlElixir do
   ```
 
   ## Usage
-  TomlElixir is used by calling parse functions
+  TomlElixir is used by calling decode functions
 
-  * `TomlElixir.parse/2`
-  * `TomlElixir.parse!/2`
-  * `TomlElixir.parse_file/2`
-  * `TomlElixir.parse_file!/2`
+  * `TomlElixir.decode/2`
+  * `TomlElixir.decode!/2`
   """
 
   @type options :: map | keyword
 
   @doc """
-  Parse toml string to map.
+  Decode toml string to map.
 
   ## Options
     * `:spec` - The TOML specification version to follow. Can be `:"1.1.0"` (default) or `:"1.0.0"`.
 
   ## Example
   ```
-  TomlElixir.parse("toml = true", spec: :"1.1.0")
+  TomlElixir.decode("toml = true", spec: :"1.1.0")
   ```
   """
-  @spec parse(binary, options) :: {:ok, map} | {:error, Exception.t()}
-  def parse(str, opts \\ []) when is_binary(str) do
-    TomlElixir.Parser.parse(str, opts)
+  @spec decode(binary, options) :: {:ok, map} | {:error, Exception.t()}
+  def decode(str, opts \\ []) when is_binary(str) do
+    TomlElixir.Parser.decode(str, opts)
   end
 
   @doc """
-  Same as `parse/2`, but raises error on failure
+  Same as `decode/2`, but raises error on failure.
 
   ## Example
   ```
-  TomlElixir.parse!("toml = true")
+  TomlElixir.decode!("toml = true")
   ```
   """
-  @spec parse!(binary, options) :: map
-  def parse!(str, opts \\ []) when is_binary(str) do
-    case parse(str, opts) do
+  @spec decode!(binary, options) :: map
+  def decode!(str, opts \\ []) when is_binary(str) do
+    case decode(str, opts) do
       {:ok, map} -> map
       {:error, err} -> raise err
     end
-  end
-
-  @doc """
-  Parse toml file, uses same options as `parse/2`
-
-  ## Example
-  ```
-  TomlElixir.parse_file("path/to/example.toml")
-  ```
-  """
-  @spec parse_file(binary, options) :: {:ok, map} | {:error, Exception.t()}
-  def parse_file(path, opts \\ []) do
-    with {:ok, str} <- File.read(path) do
-      parse(str, opts)
-    end
-  end
-
-  @doc """
-  Same as `parse_file/2`, but raises error on failure
-
-  ## Example
-  ```
-  TomlElixir.parse_file!("path/to/example.toml")
-  ```
-  """
-  @spec parse_file!(binary, options) :: map
-  def parse_file!(path, opts \\ []) do
-    src = File.read!(path)
-    parse!(src, opts)
   end
 end

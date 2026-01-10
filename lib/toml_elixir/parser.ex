@@ -8,11 +8,11 @@ defmodule TomlElixir.Parser do
 
   @type options :: map | keyword
 
-  @spec parse(binary, options) :: {:ok, map} | {:error, Exception.t()}
-  def parse(str, opts \\ []) when is_binary(str) do
+  @spec decode(binary, options) :: {:ok, map} | {:error, Exception.t()}
+  def decode(str, opts \\ []) when is_binary(str) do
     str = normalize_input(str)
     spec = Keyword.get(opts, :spec, :"1.1.0")
-    {:ok, Document.parse(str, spec)}
+    {:ok, Document.decode(str, spec)}
   rescue
     exception in Error -> {:error, exception}
   end

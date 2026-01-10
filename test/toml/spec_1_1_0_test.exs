@@ -33,7 +33,8 @@ defmodule TomlElixir.Spec110Test do
             |> JSON.decode!()
             |> normalize_for_test()
 
-          assert {:ok, actual} = TomlElixir.parse_file(path, spec: :"1.1.0")
+          toml = File.read!(path)
+          assert {:ok, actual} = TomlElixir.decode(toml, spec: :"1.1.0")
           assert normalize_for_test(actual) == expected
         end
 
@@ -41,7 +42,8 @@ defmodule TomlElixir.Spec110Test do
         @tag :invalid
         test "invalid #{rel_path}" do
           path = Path.join(@toml_root, unquote(rel_path))
-          assert {:error, _} = TomlElixir.parse_file(path, spec: :"1.1.0")
+          toml = File.read!(path)
+          assert {:error, _} = TomlElixir.decode(toml, spec: :"1.1.0")
         end
 
       true ->

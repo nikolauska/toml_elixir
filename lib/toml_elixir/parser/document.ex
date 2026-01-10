@@ -8,8 +8,8 @@ defmodule TomlElixir.Parser.Document do
   alias TomlElixir.Parser.Table
   alias TomlElixir.Parser.Value
 
-  @spec parse(binary, atom) :: map
-  def parse(input, spec \\ :"1.1.0") do
+  @spec decode(binary, atom) :: map
+  def decode(input, spec \\ :"1.1.0") do
     state = State.new(input, spec)
     builder = Builder.new()
     {state, builder} = parse_document(state, builder)
