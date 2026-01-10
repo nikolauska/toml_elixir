@@ -11,7 +11,7 @@ defmodule TomlElixir do
 
   ```elixir
   def deps do
-    [{:toml_elixir, "~> 2.0.0"}]
+    [{:toml_elixir, "~> 3.0.0"}]
   end
   ```
 
