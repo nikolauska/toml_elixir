@@ -19,7 +19,10 @@ defmodule TomlElixir.Mixfile do
       name: "Toml Elixir",
       source_url: "https://github.com/nikolauska/toml_elixir",
       homepage_url: "http://github.com/nikolauska/toml_elixir",
-      docs: [main: "TomlElixir"],
+      docs: [
+        main: "readme",
+        extras: ["README.md", "LICENSE.md"]
+      ],
 
       # Test coverage
       test_coverage: [tool: ExCoveralls],
