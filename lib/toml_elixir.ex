@@ -23,21 +23,23 @@ defmodule TomlElixir do
   * `TomlElixir.parse_file/2`
   * `TomlElixir.parse_file!/2`
   """
-  alias TomlElixir.Decoder
 
   @type options :: map | keyword
 
   @doc """
-  Parse toml string to map
+  Parse toml string to map.
+
+  ## Options
+    * `:spec` - The TOML specification version to follow. Can be `:"1.1.0"` (default) or `:"1.0.0"`.
 
   ## Example
   ```
-  TomlElixir.parse("toml = true")
+  TomlElixir.parse("toml = true", spec: :"1.1.0")
   ```
   """
-  @spec parse(binary, options) :: {:ok, map} | {:error, Exception.t}
+  @spec parse(binary, options) :: {:ok, map} | {:error, Exception.t()}
   def parse(str, opts \\ []) when is_binary(str) do
-    Decoder.decode(str, opts)
+    TomlElixir.Parser.parse(str, opts)
   end
 
   @doc """
@@ -64,10 +66,9 @@ defmodule TomlElixir do
   TomlElixir.parse_file("path/to/example.toml")
   ```
   """
-  @spec parse_file(binary, options) :: {:ok, map} | {:error, Exception.t}
+  @spec parse_file(binary, options) :: {:ok, map} | {:error, Exception.t()}
   def parse_file(path, opts \\ []) do
-    with {:ok, str} <- File.read(path)
-    do
+    with {:ok, str} <- File.read(path) do
       parse(str, opts)
     end
   end
