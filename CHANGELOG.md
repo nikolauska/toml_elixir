@@ -1,3 +1,9 @@
+## 3.1.0 (TBD)
+
+### Features
+
+* **Encoder Protocol**: Added `TomlElixir.Encoder` protocol to support encoding custom structs via `@derive`.
+
 ## 3.0.0 (2026-01-10)
 
 ### Breaking Changes

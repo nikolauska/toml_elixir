@@ -13,6 +13,7 @@
 - **Bidirectional**: Full support for both decoding (TOML to Map) and encoding (Map to TOML).
 - **Strict Parsing**: Comprehensive error messages for invalid TOML documents.
 - **Spec Selection**: Allows you to choose which TOML version to follow during decoding.
+- **Struct Support**: Use the `TomlElixir.Encoder` protocol to encode custom structs via `@derive`.
 
 ## Installation
 
@@ -44,8 +45,6 @@ temp_targets = { cpu = 79.5, case = 72.0 }
 
 # Simple decoding
 {:ok, data} = TomlElixir.decode(toml_string)
-
-# Raising version
 data = TomlElixir.decode!(toml_string)
 
 # Specify TOML version (default is :"1.1.0")
@@ -66,9 +65,24 @@ data = %{
 }
 
 {:ok, toml_string} = TomlElixir.encode(data)
-
-# Raising version
 toml_string = TomlElixir.encode!(data)
+```
+
+### Encoding Structs
+
+You can use the `TomlElixir.Encoder` protocol to allow your structs to be encoded as TOML.
+
+```elixir
+defmodule User do
+  @derive TomlElixir.Encoder
+  defstruct [:name, :age]
+end
+
+user = %User{name: "Alice", age: 30}
+toml_string = TomlElixir.encode!(%{user: user})
+# [user]
+# age = 30
+# name = "Alice"
 ```
 
 ## Type Mapping

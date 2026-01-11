@@ -68,7 +68,7 @@ defmodule TomlElixir do
   """
   @spec encode(map, options) :: {:ok, binary} | {:error, any}
   def encode(map, opts \\ []) when is_map(map) do
-    TomlElixir.Encoder.encode(map, opts)
+    TomlElixir.Encoder.Serializer.encode(map, opts)
   rescue
     e -> {:error, e}
   end
