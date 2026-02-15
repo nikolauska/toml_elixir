@@ -2,9 +2,11 @@ defmodule TomlElixir.Mixfile do
   use Mix.Project
 
   def project do
+    version = "3.1.0"
+
     [
       app: :toml_elixir,
-      version: "3.0.0",
+      version: version,
       elixir: ">= 1.18.0",
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,
@@ -17,10 +19,12 @@ defmodule TomlElixir.Mixfile do
       # Docs
       name: "Toml Elixir",
       source_url: "https://github.com/nikolauska/toml_elixir",
-      homepage_url: "http://github.com/nikolauska/toml_elixir",
+      homepage_url: "https://github.com/nikolauska/toml_elixir",
       docs: [
         main: "readme",
-        extras: ["README.md", "LICENSE.md"]
+        extras: ["README.md", "LICENSE.md"],
+        source_url: "https://github.com/nikolauska/toml_elixir",
+        source_ref: "v#{version}"
       ],
 
       # Test coverage
@@ -61,7 +65,7 @@ defmodule TomlElixir.Mixfile do
 
   defp description do
     """
-    TOML parser for elixir
+    Modern TOML parser and encoder for Elixir with protocol-based struct support
     """
   end
 
