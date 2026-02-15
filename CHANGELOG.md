@@ -3,6 +3,7 @@
 ### Features
 
 * **Encoder Protocol**: Added `TomlElixir.Encoder` protocol to support encoding custom structs via `@derive`.
+* **Derive Key Filtering**: Added JSON-style struct field filtering for `TomlElixir.Encoder` via `@derive {TomlElixir.Encoder, only: [...]}` and `@derive {TomlElixir.Encoder, except: [...]}`.
 
 ## 3.0.0 (2026-01-10)
 

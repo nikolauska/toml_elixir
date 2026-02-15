@@ -85,6 +85,30 @@ toml_string = TomlElixir.encode!(%{user: user})
 # name = "Alice"
 ```
 
+You can also choose which struct keys are encoded:
+
+```elixir
+defmodule User do
+  @derive {TomlElixir.Encoder, only: [:name]}
+  defstruct [:name, :age, :password]
+end
+
+defmodule PublicUser do
+  @derive {TomlElixir.Encoder, except: [:password]}
+  defstruct [:name, :age, :password]
+end
+```
+
+Prefer `:only` to avoid leaking new fields added to a struct in the future.
+
+If you do not own the struct module, you can derive the protocol externally:
+
+```elixir
+Protocol.derive(TomlElixir.Encoder, NameOfTheStruct, only: [:public_field])
+Protocol.derive(TomlElixir.Encoder, NameOfTheStruct, except: [:private_field])
+Protocol.derive(TomlElixir.Encoder, NameOfTheStruct)
+```
+
 ## Type Mapping
 
 | TOML Type | Elixir Type |
