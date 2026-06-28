@@ -21,9 +21,7 @@ defmodule TomlElixir.Parser.Table do
 
   @spec to_map(t) :: map
   def to_map(%__MODULE__{data: data}) do
-    Enum.reduce(data, %{}, fn {key, value}, acc ->
-      Map.put(acc, key, normalize_value(value))
-    end)
+    Map.new(data, fn {key, value} -> {key, normalize_value(value)} end)
   end
 
   defp normalize_value(%__MODULE__{} = table), do: to_map(table)

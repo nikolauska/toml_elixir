@@ -103,7 +103,7 @@ defmodule TomlElixir.Parser.Strings do
             {segment, state} = parse_basic_escape(state, multiline?)
             parse_basic_content(state, multiline?, [segment | acc])
 
-          basic_control_char?(codepoint) ->
+          control_char?(codepoint) ->
             Error.raise("Control character in string")
 
           true ->
@@ -159,7 +159,7 @@ defmodule TomlElixir.Parser.Strings do
               Error.raise("Newline in literal string")
             end
 
-          literal_control_char?(codepoint) ->
+          control_char?(codepoint) ->
             Error.raise("Control character in literal string")
 
           true ->
@@ -240,7 +240,7 @@ defmodule TomlElixir.Parser.Strings do
         Error.raise("Unexpected end of unicode escape")
 
       codepoint ->
-        if is_hex?(codepoint) do
+        if hex?(codepoint) do
           {cp, state} = State.next_codepoint(state)
           take_exact_hex(state, remaining - 1, [<<cp::utf8>> | acc])
         else
@@ -329,7 +329,7 @@ defmodule TomlElixir.Parser.Strings do
     end
   end
 
-  defp control_char?(codepoint) do
+  def control_char?(codepoint) do
     (codepoint >= 0x00 and codepoint <= 0x08) or
       codepoint == 0x0B or
       codepoint == 0x0C or
@@ -337,15 +337,7 @@ defmodule TomlElixir.Parser.Strings do
       codepoint == 0x7F
   end
 
-  defp basic_control_char?(codepoint) do
-    control_char?(codepoint)
-  end
-
-  defp literal_control_char?(codepoint) do
-    control_char?(codepoint)
-  end
-
-  defp is_hex?(codepoint) do
+  defp hex?(codepoint) do
     (codepoint >= ?0 and codepoint <= ?9) or
       (codepoint >= ?A and codepoint <= ?F) or
       (codepoint >= ?a and codepoint <= ?f)

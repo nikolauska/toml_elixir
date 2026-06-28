@@ -40,6 +40,12 @@ jobs:
     - name: Check Formatting
       run: mix format --check-formatted
 
+    - name: Check duplicated code
+      run: mix ex_dna
+
+    - name: Run static analysis
+      run: mix credo
+
     - name: Compile with warnings as errors
       run: mix compile --warnings-as-errors
 

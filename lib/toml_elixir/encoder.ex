@@ -276,7 +276,7 @@ defmodule TomlElixir.Encoder.Serializer do
     {scalars, complex} =
       map
       |> Enum.sort_by(fn {k, _} -> to_string(k) end)
-      |> Enum.split_with(fn {_, v} -> not is_map_like(v) and not is_array_of_maps(v) end)
+      |> Enum.split_with(fn {_, v} -> not map_like?(v) and not array_of_maps?(v) end)
 
     # Scalars first in the current scope
     scalar_lines =
@@ -288,10 +288,11 @@ defmodule TomlElixir.Encoder.Serializer do
     complex_lines =
       Enum.map(complex, fn {k, v} ->
         raw_key = to_string(k)
+        # credo:disable-for-next-line Credo.Check.Refactor.AppendSingleItem
         new_path = path ++ [raw_key]
 
         cond do
-          is_array_of_maps(v) ->
+          array_of_maps?(v) ->
             path_str = Enum.map_join(new_path, ".", &Helpers.encode_key/1)
 
             Enum.map(v, fn item ->
@@ -303,7 +304,7 @@ defmodule TomlElixir.Encoder.Serializer do
               ]
             end)
 
-          is_map_like(v) ->
+          map_like?(v) ->
             path_str = Enum.map_join(new_path, ".", &Helpers.encode_key/1)
 
             [
@@ -318,17 +319,17 @@ defmodule TomlElixir.Encoder.Serializer do
     [scalar_lines, complex_lines]
   end
 
-  defp is_array_of_maps(v) do
-    is_list(v) and v != [] and Enum.all?(v, &is_map_like/1)
+  defp array_of_maps?(v) do
+    is_list(v) and v != [] and Enum.all?(v, &map_like?/1)
   end
 
-  defp is_map_like(v) do
-    is_map(v) and not is_special_scalar(v)
+  defp map_like?(v) do
+    is_map(v) and not special_scalar?(v)
   end
 
-  defp is_special_scalar(%DateTime{}), do: true
-  defp is_special_scalar(%NaiveDateTime{}), do: true
-  defp is_special_scalar(%Date{}), do: true
-  defp is_special_scalar(%Time{}), do: true
-  defp is_special_scalar(_), do: false
+  defp special_scalar?(%DateTime{}), do: true
+  defp special_scalar?(%NaiveDateTime{}), do: true
+  defp special_scalar?(%Date{}), do: true
+  defp special_scalar?(%Time{}), do: true
+  defp special_scalar?(_), do: false
 end

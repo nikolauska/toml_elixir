@@ -126,6 +126,7 @@ defmodule TomlElixir.Parser.Builder do
 
       {:ok, %ArrayTable{items: items}} ->
         new_table = Table.new(explicit?: true)
+        # credo:disable-for-next-line Credo.Check.Refactor.AppendSingleItem
         %{table | data: Map.put(table.data, key, %ArrayTable{items: items ++ [new_table]})}
 
       {:ok, %Table{}} ->

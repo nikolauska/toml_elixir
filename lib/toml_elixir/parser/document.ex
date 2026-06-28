@@ -438,15 +438,7 @@ defmodule TomlElixir.Parser.Document do
   end
 
   defp comment_char?(codepoint) do
-    not control_char?(codepoint) and codepoint != ?\n and codepoint != ?\r
-  end
-
-  defp control_char?(codepoint) do
-    (codepoint >= 0x00 and codepoint <= 0x08) or
-      codepoint == 0x0B or
-      codepoint == 0x0C or
-      (codepoint >= 0x0E and codepoint <= 0x1F) or
-      codepoint == 0x7F
+    not Strings.control_char?(codepoint) and codepoint != ?\n and codepoint != ?\r
   end
 
   defp consume_newline(%State{} = state) do

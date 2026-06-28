@@ -10,8 +10,7 @@ defmodule TomlElixir.EncodeTest do
       |> String.split("\n")
       |> Enum.map(&String.trim/1)
       |> Enum.reject(&(&1 == "" or String.starts_with?(&1, "#")))
-      |> Enum.filter(&String.starts_with?(&1, "valid/"))
-      |> Enum.filter(&String.ends_with?(&1, ".toml"))
+      |> Enum.filter(&(String.starts_with?(&1, "valid/") and String.ends_with?(&1, ".toml")))
       |> Enum.map(fn path -> {spec, path} end)
     end
 
