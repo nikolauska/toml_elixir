@@ -15,8 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        elixir: ['1.18.x', '1.19.x']
-        otp: ['27.x', '28.x']
+        elixir: ['1.18.x', '1.19.x', '1.20.x']
+        otp: ['27.x', '28.x', '29.x']
 
     steps:
     - uses: actions/checkout@v4
