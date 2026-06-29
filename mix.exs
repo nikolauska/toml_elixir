@@ -72,6 +72,7 @@ defmodule TomlElixir.Mixfile do
   # Type "mix help deps" for more examples and options
   defp deps do
     [
+      {:benchee, "~> 1.5", only: :dev},
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
       {:ex_dna, "~> 1.5", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.39", only: :dev, runtime: false},

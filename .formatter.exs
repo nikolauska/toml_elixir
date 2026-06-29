@@ -1,4 +1,4 @@
 [
-  inputs: ["*.{ex,exs}", "{lib,test}/**/*.{ex,exs}"],
+  inputs: ["*.{ex,exs}", "{lib,test,bench}/**/*.{ex,exs}"],
   plugins: [Styler]
 ]

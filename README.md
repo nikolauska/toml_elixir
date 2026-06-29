@@ -135,6 +135,9 @@ mix test
 
 # Run coverage report
 mix coveralls
+
+# Run decode and encode benchmarks
+mix run bench/encode_decode.exs
 ```
 
 ## License
