@@ -8,6 +8,8 @@ defmodule TomlElixir.Parser.Document do
   alias TomlElixir.Parser.Table
   alias TomlElixir.Parser.Value
 
+  @comment_end ~r/[\x00-\x08\x0A-\x1F\x7F]/
+
   @spec decode(binary, atom) :: map
   def decode(input, spec \\ :"1.1.0") do
     state = State.new(input, spec)
@@ -358,10 +360,20 @@ defmodule TomlElixir.Parser.Document do
     end
   end
 
-  defp skip_comment(%State{} = state) do
+  defp skip_comment(%State{input: input} = state) do
     state = expect_char(state, ?#)
-    {_, state} = take_while(state, &comment_char?/1)
-    state
+
+    case Regex.run(@comment_end, input, return: :index, offset: state.index) do
+      nil ->
+        %{state | index: byte_size(input)}
+
+      [{index, 1}] ->
+        if :binary.at(input, index) in [?\n, ?\r] do
+          %{state | index: index}
+        else
+          Error.raise("Control character in comment")
+        end
+    end
   end
 
   defp consume_line_end(%State{} = state) do
@@ -431,10 +443,6 @@ defmodule TomlElixir.Parser.Document do
       ?# -> false
       _ -> true
     end
-  end
-
-  defp comment_char?(codepoint) do
-    not Strings.control_char?(codepoint) and codepoint != ?\n and codepoint != ?\r
   end
 
   defp consume_newline(%State{} = state) do
