@@ -130,7 +130,7 @@ defmodule TomlElixir.Parser.Document do
         {state, value}
 
       true ->
-        {token, state} = take_while(state, &bare_key_char?/1)
+        {token, state} = take_bare_key(state)
 
         if token == "" do
           Error.raise("Invalid key")
@@ -167,7 +167,7 @@ defmodule TomlElixir.Parser.Document do
         {state, value}
 
       true ->
-        {token, state} = take_while(state, &value_token_char?/1)
+        {token, state} = take_value_token(state)
 
         {token, state} =
           if match?(<<_::binary-size(4), ?-, _::binary-size(2), ?-, _::binary-size(2)>>, token) and
@@ -176,7 +176,7 @@ defmodule TomlElixir.Parser.Document do
 
             case State.peek_codepoint(state_after_space) do
               digit when digit in ?0..?9 ->
-                {time_part, state_after_time} = take_while(state_after_space, &value_token_char?/1)
+                {time_part, state_after_time} = take_value_token(state_after_space)
 
                 if match?(<<_::binary-size(2), ?:, _::binary-size(2), _::binary>>, time_part) do
                   {token <> " " <> time_part, state_after_time}
@@ -409,41 +409,30 @@ defmodule TomlElixir.Parser.Document do
     end
   end
 
-  defp take_while(%State{index: index} = state, predicate), do: take_while(state, predicate, index)
-
-  defp take_while(%State{input: input, index: index} = state, predicate, start) do
-    codepoint = State.peek_codepoint(state)
-
-    if codepoint != nil and predicate.(codepoint) do
-      {_, state} = State.next_codepoint(state)
-      take_while(state, predicate, start)
-    else
-      token = input |> :binary.part(start, index - start) |> :binary.copy()
-      {token, state}
-    end
+  defp take_bare_key(%State{input: input, index: index} = state) do
+    rest = :binary.part(input, index, byte_size(input) - index)
+    length = bare_key_length(rest, 0)
+    token = input |> :binary.part(index, length) |> :binary.copy()
+    {token, %{state | index: index + length}}
   end
 
-  defp bare_key_char?(codepoint) do
-    (codepoint >= ?a and codepoint <= ?z) or
-      (codepoint >= ?A and codepoint <= ?Z) or
-      (codepoint >= ?0 and codepoint <= ?9) or
-      codepoint == ?_ or
-      codepoint == ?-
+  defp bare_key_length(<<char, rest::binary>>, length)
+       when char in ?a..?z or char in ?A..?Z or char in ?0..?9 or char in [?_, ?-] do
+    bare_key_length(rest, length + 1)
   end
 
-  defp value_token_char?(codepoint) do
-    case codepoint do
-      ?\s -> false
-      ?\t -> false
-      ?\n -> false
-      ?\r -> false
-      ?, -> false
-      ?] -> false
-      ?} -> false
-      ?# -> false
-      _ -> true
-    end
+  defp bare_key_length(_, length), do: length
+
+  defp take_value_token(%State{input: input, index: index} = state) do
+    rest = :binary.part(input, index, byte_size(input) - index)
+    length = value_token_length(rest, 0)
+    token = input |> :binary.part(index, length) |> :binary.copy()
+    {token, %{state | index: index + length}}
   end
+
+  defp value_token_length(<<char, _::binary>>, length) when char in [?\s, ?\t, ?\n, ?\r, ?,, ?], ?}, ?#], do: length
+  defp value_token_length(<<_, rest::binary>>, length), do: value_token_length(rest, length + 1)
+  defp value_token_length("", length), do: length
 
   defp consume_newline(%State{} = state) do
     if State.peek_prefix?(state, "\r\n") do
