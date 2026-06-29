@@ -339,7 +339,9 @@ defmodule TomlElixir.Parser.Strings do
   end
 
   defp basic_segment_length(<<char, _::binary>>, length)
-       when char <= 0x08 or char in 0x0A..0x1F or char in [?\", ?\\, 0x7F], do: length
+       when char <= 0x08 or char in 0x0A..0x1F or char in [?\", ?\\, 0x7F] do
+    length
+  end
 
   defp basic_segment_length(<<_, rest::binary>>, length), do: basic_segment_length(rest, length + 1)
   defp basic_segment_length("", length), do: length
