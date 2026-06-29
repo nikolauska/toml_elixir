@@ -52,7 +52,7 @@ defmodule TomlElixir.Parser.Document do
       state = skip_spaces(state)
       state = expect_char(state, ?=)
       state = skip_spaces(state)
-      {state, value} = parse_value(state, inline?: false)
+      {state, value} = parse_value(state, false)
       builder = Builder.put_value(builder, key, value)
       state = consume_line_end(state)
       {state, builder}
@@ -138,9 +138,7 @@ defmodule TomlElixir.Parser.Document do
     end
   end
 
-  defp parse_value(%State{} = state, opts) do
-    inline? = Keyword.get(opts, :inline?, false)
-
+  defp parse_value(%State{} = state, inline?) do
     cond do
       State.peek_prefix?(state, "\"\"\"") ->
         {value, state} = Strings.parse_basic(state, multiline?: true)
@@ -159,7 +157,7 @@ defmodule TomlElixir.Parser.Document do
         {state, value}
 
       State.peek_prefix?(state, "[") ->
-        {state, value} = parse_array(state, inline?: inline?)
+        {state, value} = parse_array(state, inline?)
         {state, value}
 
       State.peek_prefix?(state, "{") ->
@@ -198,9 +196,7 @@ defmodule TomlElixir.Parser.Document do
     end
   end
 
-  defp parse_array(%State{} = state, opts) do
-    inline? = Keyword.get(opts, :inline?, false)
-
+  defp parse_array(%State{} = state, inline?) do
     state = expect_prefix(state, "[")
     state = skip_array_ws(state, inline?)
 
@@ -215,7 +211,7 @@ defmodule TomlElixir.Parser.Document do
   end
 
   defp parse_array_values(%State{} = state, inline?, acc) do
-    {state, value} = parse_value(state, inline?: inline?)
+    {state, value} = parse_value(state, inline?)
     state = skip_array_ws(state, inline?)
 
     case State.peek_codepoint(state) do
@@ -253,7 +249,7 @@ defmodule TomlElixir.Parser.Document do
     state = skip_inline_ws(state)
     state = expect_char(state, ?=)
     state = skip_inline_ws(state)
-    {state, value} = parse_value(state, inline?: true)
+    {state, value} = parse_value(state, true)
     table = Builder.put_inline_value(table, key, value)
     state = skip_inline_ws(state)
 

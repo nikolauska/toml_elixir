@@ -16,7 +16,9 @@ defmodule TomlElixir.Parser.Value do
   end
 
   defp parse_number_or_datetime(token, spec) do
-    case parse_datetime(token, spec) do
+    datetime = if datetime_candidate?(token), do: parse_datetime(token, spec), else: :error
+
+    case datetime do
       {:ok, value} ->
         value
 
@@ -33,6 +35,9 @@ defmodule TomlElixir.Parser.Value do
         end
     end
   end
+
+  defp datetime_candidate?(<<_::binary-size(4), ?-, _::binary>>), do: true
+  defp datetime_candidate?(token), do: :binary.match(token, ":") != :nomatch
 
   defp parse_integer(token) do
     sign = if String.starts_with?(token, "-") or String.starts_with?(token, "+"), do: String.first(token), else: ""
