@@ -58,9 +58,10 @@ defmodule TomlElixir.Parser.Value do
       :error
     else
       with :ok <- validate_underscores(digits),
+           digits = String.replace(digits, "_", ""),
            :ok <- validate_digits(digits, base),
            :ok <- validate_leading_zero(digits, base),
-           {int, ""} <- Integer.parse(String.replace(digits, "_", ""), base) do
+           {int, ""} <- Integer.parse(digits, base) do
         value = if sign == ?-, do: -int, else: int
         {:ok, value}
       else
@@ -113,7 +114,7 @@ defmodule TomlElixir.Parser.Value do
           with :ok <- validate_underscores(int),
                :ok <- validate_underscores(frac || ""),
                :ok <- validate_underscores(exp || ""),
-               :ok <- validate_leading_zero(int, 10) do
+               :ok <- validate_leading_zero(String.replace(int, "_", ""), 10) do
             value = token |> String.replace("_", "") |> Float.parse()
 
             case value do
@@ -282,9 +283,7 @@ defmodule TomlElixir.Parser.Value do
   end
 
   defp validate_leading_zero(digits, 10) do
-    cleaned = String.replace(digits, "_", "")
-
-    if String.length(cleaned) > 1 and String.starts_with?(cleaned, "0") do
+    if byte_size(digits) > 1 and String.starts_with?(digits, "0") do
       :error
     else
       :ok
@@ -304,21 +303,11 @@ defmodule TomlElixir.Parser.Value do
     end
   end
 
-  defp validate_digits(digits, base) do
-    digits
-    |> String.replace("_", "")
-    |> String.to_charlist()
-    |> Enum.all?(fn digit ->
-      cond do
-        digit >= ?0 and digit <= ?9 -> digit - ?0 < base
-        digit >= ?a and digit <= ?f -> base == 16
-        digit >= ?A and digit <= ?F -> base == 16
-        true -> false
-      end
-    end)
-    |> case do
-      true -> :ok
-      false -> :error
-    end
-  end
+  defp validate_digits(<<digit, rest::binary>>, base) when digit in ?0..?9 and digit - ?0 < base,
+    do: validate_digits(rest, base)
+
+  defp validate_digits(<<digit, rest::binary>>, 16) when digit in ?a..?f or digit in ?A..?F, do: validate_digits(rest, 16)
+
+  defp validate_digits("", _base), do: :ok
+  defp validate_digits(_digits, _base), do: :error
 end

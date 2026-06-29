@@ -7,13 +7,13 @@ defmodule TomlElixir.Parser.Table do
 
   @type t :: %__MODULE__{data: map, inline?: boolean, explicit?: boolean, dotted?: boolean}
 
-  @spec new(keyword) :: t
-  def new(opts \\ []) do
+  @spec new(boolean, boolean, boolean) :: t
+  def new(inline? \\ false, explicit? \\ false, dotted? \\ false) do
     %__MODULE__{
       data: %{},
-      inline?: Keyword.get(opts, :inline?, false),
-      explicit?: Keyword.get(opts, :explicit?, false),
-      dotted?: Keyword.get(opts, :dotted?, false)
+      inline?: inline?,
+      explicit?: explicit?,
+      dotted?: dotted?
     }
   end
 

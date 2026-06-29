@@ -33,7 +33,7 @@ defmodule TomlElixir.Parser.Builder do
 
   @spec inline_table() :: Table.t()
   def inline_table do
-    Table.new(inline?: true, explicit?: true)
+    Table.new(true, true)
   end
 
   @spec put_inline_value(Table.t(), [String.t()], any) :: Table.t()
@@ -53,7 +53,7 @@ defmodule TomlElixir.Parser.Builder do
 
     case Map.fetch(table.data, key) do
       :error ->
-        new_table = Table.new(explicit?: explicit?)
+        new_table = Table.new(false, explicit?)
         %{table | data: Map.put(table.data, key, new_table)}
 
       {:ok, %Table{} = existing} ->
@@ -121,11 +121,11 @@ defmodule TomlElixir.Parser.Builder do
 
     case Map.fetch(table.data, key) do
       :error ->
-        new_table = Table.new(explicit?: true)
+        new_table = Table.new(false, true)
         %{table | data: Map.put(table.data, key, %ArrayTable{items: [new_table]})}
 
       {:ok, %ArrayTable{items: items}} ->
-        new_table = Table.new(explicit?: true)
+        new_table = Table.new(false, true)
         # credo:disable-for-next-line Credo.Check.Refactor.AppendSingleItem
         %{table | data: Map.put(table.data, key, %ArrayTable{items: items ++ [new_table]})}
 
@@ -187,7 +187,7 @@ defmodule TomlElixir.Parser.Builder do
 
     case Map.fetch(table.data, key) do
       :error ->
-        child = Table.new(inline?: allow_inline?, dotted?: not allow_inline?)
+        child = Table.new(allow_inline?, false, not allow_inline?)
         updated_child = put_value_in(child, tail, value, allow_inline?, depth - 1)
         %{table | data: Map.put(table.data, key, updated_child)}
 

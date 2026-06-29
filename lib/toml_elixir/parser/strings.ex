@@ -70,6 +70,10 @@ defmodule TomlElixir.Parser.Strings do
       not multiline? and State.peek_prefix?(state, "\"") ->
         {IO.iodata_to_binary(Enum.reverse(acc)), State.consume_prefix(state, "\"")}
 
+      result = take_basic_segment(state) ->
+        {segment, state} = result
+        parse_basic_content(state, multiline?, [segment | acc])
+
       true ->
         {codepoint, state} = State.next_codepoint(state)
 
@@ -129,6 +133,10 @@ defmodule TomlElixir.Parser.Strings do
 
       not multiline? and State.peek_prefix?(state, "'") ->
         {IO.iodata_to_binary(Enum.reverse(acc)), State.consume_prefix(state, "'")}
+
+      result = take_literal_segment(state) ->
+        {segment, state} = result
+        parse_literal_content(state, multiline?, [segment | acc])
 
       true ->
         {codepoint, state} = State.next_codepoint(state)
@@ -323,6 +331,34 @@ defmodule TomlElixir.Parser.Strings do
     else
       Error.raise("Unexpected string delimiter")
     end
+  end
+
+  defp take_basic_segment(%State{input: input, index: index} = state) do
+    rest = :binary.part(input, index, byte_size(input) - index)
+    take_segment(state, basic_segment_length(rest, 0))
+  end
+
+  defp basic_segment_length(<<char, _::binary>>, length)
+       when char <= 0x08 or char in 0x0A..0x1F or char in [?\", ?\\, 0x7F], do: length
+
+  defp basic_segment_length(<<_, rest::binary>>, length), do: basic_segment_length(rest, length + 1)
+  defp basic_segment_length("", length), do: length
+
+  defp take_literal_segment(%State{input: input, index: index} = state) do
+    rest = :binary.part(input, index, byte_size(input) - index)
+    take_segment(state, literal_segment_length(rest, 0))
+  end
+
+  defp literal_segment_length(<<char, _::binary>>, length) when char <= 0x08 or char in 0x0A..0x1F or char in [?', 0x7F],
+    do: length
+
+  defp literal_segment_length(<<_, rest::binary>>, length), do: literal_segment_length(rest, length + 1)
+  defp literal_segment_length("", length), do: length
+
+  defp take_segment(_state, 0), do: nil
+
+  defp take_segment(%State{input: input, index: index} = state, length) do
+    {:binary.part(input, index, length), %{state | index: index + length}}
   end
 
   def control_char?(codepoint) do
