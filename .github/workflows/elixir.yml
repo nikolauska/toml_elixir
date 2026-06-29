@@ -16,7 +16,14 @@ jobs:
     strategy:
       matrix:
         elixir: ['1.18.x', '1.19.x', '1.20.x']
-        otp: ['27.x', '28.x', '29.x']
+        otp: ['26.x', '27.x', '28.x', '29.x']
+        exclude:
+          - elixir: '1.18.x'
+            otp: '29.x'
+          - elixir: '1.19.x'
+            otp: '29.x'
+          - elixir: '1.20.x'
+            otp: '26.x'
 
     steps:
     - uses: actions/checkout@v4
