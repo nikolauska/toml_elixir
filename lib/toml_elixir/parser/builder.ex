@@ -27,7 +27,7 @@ defmodule TomlElixir.Parser.Builder do
   @spec put_value(t, [String.t()], any) :: t
   def put_value(%__MODULE__{} = builder, path, value) do
     depth = length(builder.current)
-    root = put_value_in(builder.root, builder.current ++ path, value, allow_inline?: false, protected_depth: depth)
+    root = put_value_in(builder.root, builder.current ++ path, value, false, depth)
     %{builder | root: root}
   end
 
@@ -38,7 +38,7 @@ defmodule TomlElixir.Parser.Builder do
 
   @spec put_inline_value(Table.t(), [String.t()], any) :: Table.t()
   def put_inline_value(%Table{} = table, path, value) do
-    put_value_in(table, path, value, allow_inline?: true)
+    put_value_in(table, path, value, true, 0)
   end
 
   @spec to_map(t) :: map
@@ -168,12 +168,12 @@ defmodule TomlElixir.Parser.Builder do
     end
   end
 
-  defp put_value_in(%Table{} = table, [], _value, _opts) do
+  defp put_value_in(%Table{} = table, [], _value, _allow_inline?, _depth) do
     table
   end
 
-  defp put_value_in(%Table{} = table, [key], value, opts) do
-    assert_mutable!(table, opts[:allow_inline?])
+  defp put_value_in(%Table{} = table, [key], value, allow_inline?, _depth) do
+    assert_mutable!(table, allow_inline?)
 
     if Map.has_key?(table.data, key) do
       Error.raise("Duplicate key #{key}")
@@ -182,26 +182,23 @@ defmodule TomlElixir.Parser.Builder do
     end
   end
 
-  defp put_value_in(%Table{} = table, [key | tail], value, opts) do
-    assert_mutable!(table, opts[:allow_inline?])
-
-    depth = Keyword.get(opts, :protected_depth, 0)
-    opts = Keyword.put(opts, :protected_depth, depth - 1)
+  defp put_value_in(%Table{} = table, [key | tail], value, allow_inline?, depth) do
+    assert_mutable!(table, allow_inline?)
 
     case Map.fetch(table.data, key) do
       :error ->
-        child = Table.new(inline?: opts[:allow_inline?], dotted?: not opts[:allow_inline?])
-        updated_child = put_value_in(child, tail, value, opts)
+        child = Table.new(inline?: allow_inline?, dotted?: not allow_inline?)
+        updated_child = put_value_in(child, tail, value, allow_inline?, depth - 1)
         %{table | data: Map.put(table.data, key, updated_child)}
 
       {:ok, %Table{} = existing} ->
-        assert_mutable!(existing, opts[:allow_inline?])
+        assert_mutable!(existing, allow_inline?)
 
-        if not opts[:allow_inline?] and depth <= 0 and existing.explicit? do
+        if not allow_inline? and depth <= 0 and existing.explicit? do
           Error.raise("Table #{Enum.join([key], ".")} cannot be modified via dotted keys")
         end
 
-        updated_child = put_value_in(existing, tail, value, opts)
+        updated_child = put_value_in(existing, tail, value, allow_inline?, depth - 1)
         %{table | data: Map.put(table.data, key, updated_child)}
 
       {:ok, %ArrayTable{items: items}} ->
@@ -214,8 +211,8 @@ defmodule TomlElixir.Parser.Builder do
             Error.raise("Array of tables #{key} is empty")
 
           %Table{} = last ->
-            assert_mutable!(last, opts[:allow_inline?])
-            updated_last = put_value_in(last, tail, value, opts)
+            assert_mutable!(last, allow_inline?)
+            updated_last = put_value_in(last, tail, value, allow_inline?, depth - 1)
             updated_items = List.update_at(items, -1, fn _ -> updated_last end)
             %{table | data: Map.put(table.data, key, %ArrayTable{items: updated_items})}
         end

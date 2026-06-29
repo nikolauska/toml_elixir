@@ -4,10 +4,8 @@ defmodule TomlElixir.Parser.Strings do
   alias TomlElixir.Parser.Error
   alias TomlElixir.Parser.State
 
-  @spec parse_basic(State.t(), keyword) :: {binary, State.t()}
-  def parse_basic(%State{} = state, opts) do
-    multiline? = Keyword.get(opts, :multiline?, false)
-
+  @spec parse_basic(State.t(), boolean) :: {binary, State.t()}
+  def parse_basic(%State{} = state, multiline?) do
     state =
       if multiline? do
         ensure_prefix!(state, "\"\"\"")
@@ -28,10 +26,8 @@ defmodule TomlElixir.Parser.Strings do
     {content, state}
   end
 
-  @spec parse_literal(State.t(), keyword) :: {binary, State.t()}
-  def parse_literal(%State{} = state, opts) do
-    multiline? = Keyword.get(opts, :multiline?, false)
-
+  @spec parse_literal(State.t(), boolean) :: {binary, State.t()}
+  def parse_literal(%State{} = state, multiline?) do
     state =
       if multiline? do
         ensure_prefix!(state, "'''")

@@ -120,11 +120,11 @@ defmodule TomlElixir.Parser.Document do
         Error.raise("Multiline strings are not allowed in keys")
 
       State.peek_prefix?(state, "\"") ->
-        {value, state} = Strings.parse_basic(state, multiline?: false)
+        {value, state} = Strings.parse_basic(state, false)
         {state, value}
 
       State.peek_prefix?(state, "'") ->
-        {value, state} = Strings.parse_literal(state, multiline?: false)
+        {value, state} = Strings.parse_literal(state, false)
         {state, value}
 
       true ->
@@ -141,19 +141,19 @@ defmodule TomlElixir.Parser.Document do
   defp parse_value(%State{} = state, inline?) do
     cond do
       State.peek_prefix?(state, "\"\"\"") ->
-        {value, state} = Strings.parse_basic(state, multiline?: true)
+        {value, state} = Strings.parse_basic(state, true)
         {state, value}
 
       State.peek_prefix?(state, "'''") ->
-        {value, state} = Strings.parse_literal(state, multiline?: true)
+        {value, state} = Strings.parse_literal(state, true)
         {state, value}
 
       State.peek_prefix?(state, "\"") ->
-        {value, state} = Strings.parse_basic(state, multiline?: false)
+        {value, state} = Strings.parse_basic(state, false)
         {state, value}
 
       State.peek_prefix?(state, "'") ->
-        {value, state} = Strings.parse_literal(state, multiline?: false)
+        {value, state} = Strings.parse_literal(state, false)
         {state, value}
 
       State.peek_prefix?(state, "[") ->
@@ -168,14 +168,15 @@ defmodule TomlElixir.Parser.Document do
         {token, state} = take_while(state, &value_token_char?/1)
 
         {token, state} =
-          if Regex.match?(~r/\A\d{4}-\d{2}-\d{2}\z/, token) and State.peek_codepoint(state) == ?\s do
+          if match?(<<_::binary-size(4), ?-, _::binary-size(2), ?-, _::binary-size(2)>>, token) and
+               State.peek_codepoint(state) == ?\s do
             state_after_space = State.consume_prefix(state, " ")
 
             case State.peek_codepoint(state_after_space) do
               digit when digit in ?0..?9 ->
                 {time_part, state_after_time} = take_while(state_after_space, &value_token_char?/1)
 
-                if Regex.match?(~r/\A\d{2}:\d{2}/, time_part) do
+                if match?(<<_::binary-size(2), ?:, _::binary-size(2), _::binary>>, time_part) do
                   {token <> " " <> time_part, state_after_time}
                 else
                   {token, state}

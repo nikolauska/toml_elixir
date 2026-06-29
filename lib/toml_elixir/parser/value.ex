@@ -40,25 +40,28 @@ defmodule TomlElixir.Parser.Value do
   defp datetime_candidate?(token), do: :binary.match(token, ":") != :nomatch
 
   defp parse_integer(token) do
-    sign = if String.starts_with?(token, "-") or String.starts_with?(token, "+"), do: String.first(token), else: ""
-    rest = if sign == "", do: token, else: String.slice(token, 1..-1//1)
-
-    {base, digits} =
-      cond do
-        String.starts_with?(rest, "0x") -> {16, String.slice(rest, 2..-1//1)}
-        String.starts_with?(rest, "0o") -> {8, String.slice(rest, 2..-1//1)}
-        String.starts_with?(rest, "0b") -> {2, String.slice(rest, 2..-1//1)}
-        true -> {10, rest}
+    {sign, rest} =
+      case token do
+        <<sign, rest::binary>> when sign in [?-, ?+] -> {sign, rest}
+        _ -> {nil, token}
       end
 
-    if sign != "" and base != 10 do
+    {base, digits} =
+      case rest do
+        <<"0x", digits::binary>> -> {16, digits}
+        <<"0o", digits::binary>> -> {8, digits}
+        <<"0b", digits::binary>> -> {2, digits}
+        _ -> {10, rest}
+      end
+
+    if sign != nil and base != 10 do
       :error
     else
       with :ok <- validate_underscores(digits),
            :ok <- validate_digits(digits, base),
            :ok <- validate_leading_zero(digits, base),
            {int, ""} <- Integer.parse(String.replace(digits, "_", ""), base) do
-        value = if sign == "-", do: -int, else: int
+        value = if sign == ?-, do: -int, else: int
         {:ok, value}
       else
         _ -> :error
