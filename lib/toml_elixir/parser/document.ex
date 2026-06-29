@@ -128,7 +128,7 @@ defmodule TomlElixir.Parser.Document do
         {state, value}
 
       true ->
-        {token, state} = take_while(state, &bare_key_char?/1, [])
+        {token, state} = take_while(state, &bare_key_char?/1)
 
         if token == "" do
           Error.raise("Invalid key")
@@ -167,7 +167,7 @@ defmodule TomlElixir.Parser.Document do
         {state, value}
 
       true ->
-        {token, state} = take_while(state, &value_token_char?/1, [])
+        {token, state} = take_while(state, &value_token_char?/1)
 
         {token, state} =
           if Regex.match?(~r/\A\d{4}-\d{2}-\d{2}\z/, token) and State.peek_codepoint(state) == ?\s do
@@ -175,7 +175,7 @@ defmodule TomlElixir.Parser.Document do
 
             case State.peek_codepoint(state_after_space) do
               digit when digit in ?0..?9 ->
-                {time_part, state_after_time} = take_while(state_after_space, &value_token_char?/1, [])
+                {time_part, state_after_time} = take_while(state_after_space, &value_token_char?/1)
 
                 if Regex.match?(~r/\A\d{2}:\d{2}/, time_part) do
                   {token <> " " <> time_part, state_after_time}
@@ -363,7 +363,7 @@ defmodule TomlElixir.Parser.Document do
 
   defp skip_comment(%State{} = state) do
     state = expect_char(state, ?#)
-    {_, state} = take_while(state, &comment_char?/1, [])
+    {_, state} = take_while(state, &comment_char?/1)
     state
   end
 
@@ -400,18 +400,17 @@ defmodule TomlElixir.Parser.Document do
     end
   end
 
-  defp take_while(%State{} = state, predicate, acc) do
-    case State.peek_codepoint(state) do
-      nil ->
-        {IO.iodata_to_binary(Enum.reverse(acc)), state}
+  defp take_while(%State{index: index} = state, predicate), do: take_while(state, predicate, index)
 
-      codepoint ->
-        if predicate.(codepoint) do
-          {cp, state} = State.next_codepoint(state)
-          take_while(state, predicate, [<<cp::utf8>> | acc])
-        else
-          {IO.iodata_to_binary(Enum.reverse(acc)), state}
-        end
+  defp take_while(%State{input: input, index: index} = state, predicate, start) do
+    codepoint = State.peek_codepoint(state)
+
+    if codepoint != nil and predicate.(codepoint) do
+      {_, state} = State.next_codepoint(state)
+      take_while(state, predicate, start)
+    else
+      token = input |> :binary.part(start, index - start) |> :binary.copy()
+      {token, state}
     end
   end
 

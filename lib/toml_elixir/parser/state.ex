@@ -16,11 +16,11 @@ defmodule TomlElixir.Parser.State do
   end
 
   @spec peek_byte(t) :: integer | nil
-  def peek_byte(%__MODULE__{} = state) do
-    if eof?(state) do
+  def peek_byte(%__MODULE__{input: input, index: index}) do
+    if index >= byte_size(input) do
       nil
     else
-      :binary.at(state.input, state.index)
+      :binary.at(input, index)
     end
   end
 
@@ -43,19 +43,19 @@ defmodule TomlElixir.Parser.State do
 
   @spec next_codepoint(t) :: {integer | nil, t}
   def next_codepoint(%__MODULE__{index: index, input: input} = state) do
-    if eof?(state) do
+    if index >= byte_size(input) do
       {nil, state}
     else
       <<_::binary-size(^index), rest::binary>> = input
-      <<codepoint::utf8, _::binary>> = rest
-      size = byte_size(<<codepoint::utf8>>)
-      {codepoint, %{state | index: state.index + size}}
+      <<codepoint::utf8, tail::binary>> = rest
+      size = byte_size(rest) - byte_size(tail)
+      {codepoint, %{state | index: index + size}}
     end
   end
 
   @spec peek_codepoint(t) :: integer | nil
-  def peek_codepoint(%__MODULE__{index: index, input: input} = state) do
-    if eof?(state) do
+  def peek_codepoint(%__MODULE__{index: index, input: input}) do
+    if index >= byte_size(input) do
       nil
     else
       <<_::binary-size(^index), rest::binary>> = input
