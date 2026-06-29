@@ -41,6 +41,13 @@ jobs:
         key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
         restore-keys: ${{ runner.os }}-mix-
 
+    - name: Restore build cache
+      uses: actions/cache@v5
+      with:
+        path: _build
+        key: ${{ runner.os }}-build-${{ matrix.elixir }}-${{ matrix.otp }}-${{ github.ref_name }}-${{ github.sha }}
+        restore-keys: ${{ runner.os }}-build-${{ matrix.elixir }}-${{ matrix.otp }}-${{ github.ref_name }}-
+
     - name: Install dependencies
       run: mix deps.get
 
