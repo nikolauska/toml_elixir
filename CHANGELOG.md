@@ -1,3 +1,10 @@
+## Unreleased
+
+### Performance
+
+* **Faster Decoding**: Reduced median decode time for `bench/fixtures/example.toml` from approximately 1.04 ms to 0.44 ms.
+* **Lower Memory Usage**: Reduced measured decode allocations from approximately 1.0 MB to 323 KB.
+
 ## 3.1.0 (2026-02-15)
 
 ### Features
