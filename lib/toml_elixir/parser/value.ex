@@ -23,7 +23,9 @@ defmodule TomlElixir.Parser.Value do
         value
 
       :error ->
-        case parse_float(token, spec) do
+        float = if float_candidate?(token), do: parse_float(token, spec), else: :error
+
+        case float do
           {:ok, value} ->
             value
 
@@ -35,6 +37,9 @@ defmodule TomlElixir.Parser.Value do
         end
     end
   end
+
+  defp float_candidate?(token) when token in ["inf", "+inf", "-inf", "nan", "+nan", "-nan"], do: true
+  defp float_candidate?(token), do: :binary.match(token, [".", "e", "E"]) != :nomatch
 
   defp datetime_candidate?(<<_::binary-size(4), ?-, _::binary>>), do: true
   defp datetime_candidate?(token), do: :binary.match(token, ":") != :nomatch
