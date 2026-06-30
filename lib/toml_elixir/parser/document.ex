@@ -296,13 +296,15 @@ defmodule TomlElixir.Parser.Document do
     end
   end
 
-  defp skip_spaces(%State{} = state) do
-    case State.peek_codepoint(state) do
-      ?\s -> skip_spaces(State.consume_prefix(state, " "))
-      ?\t -> skip_spaces(State.consume_prefix(state, "\t"))
-      _ -> state
-    end
+  defp skip_spaces(%State{input: input, index: index} = state) do
+    %{state | index: skip_space_index(input, index)}
   end
+
+  defp skip_space_index(input, index) when index < byte_size(input) do
+    if :binary.at(input, index) in [?\s, ?\t], do: skip_space_index(input, index + 1), else: index
+  end
+
+  defp skip_space_index(_input, index), do: index
 
   defp skip_array_ws(%State{} = state, inline?) do
     case State.peek_codepoint(state) do
