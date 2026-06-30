@@ -232,23 +232,8 @@ defmodule TomlElixir.Parser.Value do
   end
 
   defp normalize_offset("-00:00"), do: {:ok, "Z"}
-
-  defp normalize_offset(offset) do
-    if offset in ["Z", "z"] do
-      {:ok, "Z"}
-    else
-      <<sign::binary-size(1), hour::binary-size(2), ":", minute::binary-size(2)>> = offset
-
-      hour_i = String.to_integer(hour)
-      minute_i = String.to_integer(minute)
-
-      if sign in ["+", "-"] and hour_i in 0..23 and minute_i in 0..59 do
-        {:ok, sign <> hour <> ":" <> minute}
-      else
-        :error
-      end
-    end
-  end
+  defp normalize_offset(offset) when offset in ["Z", "z"], do: {:ok, "Z"}
+  defp normalize_offset(offset), do: {:ok, offset}
 
   defp remove_underscores(value) do
     if :binary.match(value, "_") == :nomatch, do: value, else: String.replace(value, "_", "")
