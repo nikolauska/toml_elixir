@@ -63,7 +63,7 @@ defmodule TomlElixir.Parser.Value do
       :error
     else
       with :ok <- validate_underscores(digits),
-           digits = String.replace(digits, "_", ""),
+           digits = remove_underscores(digits),
            :ok <- validate_digits(digits, base),
            :ok <- validate_leading_zero(digits, base),
            {int, ""} <- Integer.parse(digits, base) do
@@ -119,8 +119,8 @@ defmodule TomlElixir.Parser.Value do
           with :ok <- validate_underscores(int),
                :ok <- validate_underscores(frac || ""),
                :ok <- validate_underscores(exp || ""),
-               :ok <- validate_leading_zero(String.replace(int, "_", ""), 10) do
-            value = token |> String.replace("_", "") |> Float.parse()
+               :ok <- validate_leading_zero(remove_underscores(int), 10) do
+            value = token |> remove_underscores() |> Float.parse()
 
             case value do
               {float, ""} -> {:ok, float}
@@ -266,6 +266,10 @@ defmodule TomlElixir.Parser.Value do
         :error
       end
     end
+  end
+
+  defp remove_underscores(value) do
+    if :binary.match(value, "_") == :nomatch, do: value, else: String.replace(value, "_", "")
   end
 
   defp validate_date(date) do
