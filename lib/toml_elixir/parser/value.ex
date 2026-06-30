@@ -109,16 +109,15 @@ defmodule TomlElixir.Parser.Value do
   defp parse_datetime(token, spec) do
     cond do
       captures =
-          Regex.named_captures(
+          Regex.run(
             if(spec == :"1.1.0",
-              do:
-                ~r/\A(?<date>\d{4}-\d{2}-\d{2})[Tt ](?<time>\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)(?<offset>Z|z|[+-]\d{2}:\d{2})\z/,
-              else:
-                ~r/\A(?<date>\d{4}-\d{2}-\d{2})[Tt ](?<time>\d{2}:\d{2}:\d{2}(?:\.\d+)?)(?<offset>Z|z|[+-]\d{2}:\d{2})\z/
+              do: ~r/\A(\d{4}-\d{2}-\d{2})[Tt ](\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)(Z|z|[+-]\d{2}:\d{2})\z/,
+              else: ~r/\A(\d{4}-\d{2}-\d{2})[Tt ](\d{2}:\d{2}:\d{2}(?:\.\d+)?)(Z|z|[+-]\d{2}:\d{2})\z/
             ),
-            token
+            token,
+            capture: :all_but_first
           ) ->
-        %{"date" => date, "time" => time, "offset" => offset} = captures
+        [date, time, offset] = captures
 
         with :ok <- validate_date(date),
              {:ok, time} <- normalize_time(time, spec),
@@ -132,14 +131,15 @@ defmodule TomlElixir.Parser.Value do
         end
 
       captures =
-          Regex.named_captures(
+          Regex.run(
             if(spec == :"1.1.0",
-              do: ~r/\A(?<date>\d{4}-\d{2}-\d{2})[Tt ](?<time>\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)\z/,
-              else: ~r/\A(?<date>\d{4}-\d{2}-\d{2})[Tt ](?<time>\d{2}:\d{2}:\d{2}(?:\.\d+)?)\z/
+              do: ~r/\A(\d{4}-\d{2}-\d{2})[Tt ](\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)\z/,
+              else: ~r/\A(\d{4}-\d{2}-\d{2})[Tt ](\d{2}:\d{2}:\d{2}(?:\.\d+)?)\z/
             ),
-            token
+            token,
+            capture: :all_but_first
           ) ->
-        %{"date" => date, "time" => time} = captures
+        [date, time] = captures
 
         with :ok <- validate_date(date),
              {:ok, time} <- normalize_time(time, spec) do
@@ -183,13 +183,14 @@ defmodule TomlElixir.Parser.Value do
   defp normalize_time(time, spec) do
     regex =
       if spec == :"1.1.0" do
-        ~r/\A(?<hour>\d{2}):(?<minute>\d{2})(?::(?<second>\d{2})(?:\.(?<fraction>\d+))?)?\z/
+        ~r/\A(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?\z/
       else
-        ~r/\A(?<hour>\d{2}):(?<minute>\d{2}):(?<second>\d{2})(?:\.(?<fraction>\d+))?\z/
+        ~r/\A(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?\z/
       end
 
-    case Regex.named_captures(regex, time) do
-      %{"hour" => hour, "minute" => minute, "second" => second, "fraction" => fraction} ->
+    case Regex.run(regex, time, capture: :all_but_first) do
+      captures when is_list(captures) ->
+        [hour, minute, second, fraction] = Enum.take(captures ++ ["", "", "", ""], 4)
         second = if second == "", do: "00", else: second
 
         case validate_time(hour, minute, second) do
