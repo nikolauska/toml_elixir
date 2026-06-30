@@ -1,9 +1,13 @@
 ## Unreleased
 
+### Fixes
+
+* **Zero offset**: Fixes zero offset datetime parsing
+
 ### Performance
 
-* **Faster Decoding**: Reduced median decode time for `bench/fixtures/example.toml` from approximately 1.04 ms to 0.44 ms.
-* **Lower Memory Usage**: Reduced measured decode allocations from approximately 1.0 MB to 323 KB.
+* **Faster Decoding**: Reduced median decode time for `bench/fixtures/example.toml` from approximately 1.04 ms to 0.36 ms.
+* **Lower Memory Usage**: Reduced measured decode allocations from approximately 1.0 MB to 196 KB.
 
 ## 3.1.0 (2026-02-15)
 
