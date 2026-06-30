@@ -136,7 +136,7 @@ defmodule TomlElixir.Parser.Value do
           _ -> :error
         end
 
-      byte_size(token) == 10 and Regex.match?(~r/\A\d{4}-\d{2}-\d{2}\z/, token) ->
+      byte_size(token) == 10 and match?(<<_::binary-size(4), ?-, _::binary>>, token) ->
         case Date.from_iso8601(token) do
           {:ok, date} -> {:ok, date}
           _ -> :error
