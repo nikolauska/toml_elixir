@@ -101,14 +101,14 @@ defmodule TomlElixir.Parser.Builder do
   end
 
   defp ensure_table_in_array(%Table{} = table, key, %ArrayTable{items: items}, tail, opts) do
-    case List.last(items) do
-      nil ->
+    case items do
+      [] ->
         Error.raise("Array of tables #{key} is empty")
 
-      %Table{} = last ->
+      [%Table{} = last | rest] ->
         assert_not_inline!(last)
         updated_last = ensure_table(last, tail, opts)
-        updated_items = List.update_at(items, -1, fn _ -> updated_last end)
+        updated_items = [updated_last | rest]
         %{table | data: Map.put(table.data, key, %ArrayTable{items: updated_items})}
     end
   end
@@ -126,8 +126,7 @@ defmodule TomlElixir.Parser.Builder do
 
       {:ok, %ArrayTable{items: items}} ->
         new_table = Table.new(false, true)
-        # credo:disable-for-next-line Credo.Check.Refactor.AppendSingleItem
-        %{table | data: Map.put(table.data, key, %ArrayTable{items: items ++ [new_table]})}
+        %{table | data: Map.put(table.data, key, %ArrayTable{items: [new_table | items]})}
 
       {:ok, %Table{}} ->
         Error.raise("Table #{key} already defined")
@@ -152,14 +151,14 @@ defmodule TomlElixir.Parser.Builder do
         %{table | data: Map.put(table.data, key, updated_child)}
 
       {:ok, %ArrayTable{items: items}} ->
-        case List.last(items) do
-          nil ->
+        case items do
+          [] ->
             Error.raise("Array of tables #{key} is empty")
 
-          %Table{} = last ->
+          [%Table{} = last | rest] ->
             assert_not_inline!(last)
             updated_last = ensure_array_table(last, tail, opts)
-            updated_items = List.update_at(items, -1, fn _ -> updated_last end)
+            updated_items = [updated_last | rest]
             %{table | data: Map.put(table.data, key, %ArrayTable{items: updated_items})}
         end
 
@@ -206,14 +205,14 @@ defmodule TomlElixir.Parser.Builder do
           Error.raise("Table #{Enum.join([key], ".")} already defined as array")
         end
 
-        case List.last(items) do
-          nil ->
+        case items do
+          [] ->
             Error.raise("Array of tables #{key} is empty")
 
-          %Table{} = last ->
+          [%Table{} = last | rest] ->
             assert_mutable!(last, allow_inline?)
             updated_last = put_value_in(last, tail, value, allow_inline?, depth - 1)
-            updated_items = List.update_at(items, -1, fn _ -> updated_last end)
+            updated_items = [updated_last | rest]
             %{table | data: Map.put(table.data, key, %ArrayTable{items: updated_items})}
         end
 

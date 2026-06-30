@@ -7,5 +7,5 @@ defmodule TomlElixir.Parser.ArrayTable do
 
   def new, do: %__MODULE__{items: []}
 
-  def to_list(%__MODULE__{items: items}), do: items
+  def to_list(%__MODULE__{items: items}), do: Enum.reverse(items)
 end
