@@ -182,42 +182,30 @@ defmodule TomlElixir.Parser.Value do
   end
 
   defp normalize_time(time, spec) do
-    regex =
-      if spec == :"1.1.0" do
-        ~r/\A(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?\z/
-      else
-        ~r/\A(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?\z/
-      end
+    case time do
+      <<hour::binary-size(2), ":", minute::binary-size(2)>> when spec == :"1.1.0" ->
+        normalize_time(hour, minute, "00", "", spec)
 
-    case Regex.run(regex, time, capture: :all_but_first) do
-      captures when is_list(captures) ->
-        [hour, minute, second, fraction] = Enum.take(captures ++ ["", "", "", ""], 4)
-        second = if second == "", do: "00", else: second
+      <<hour::binary-size(2), ":", minute::binary-size(2), ":", second::binary-size(2)>> ->
+        normalize_time(hour, minute, second, "", spec)
 
-        case validate_time(hour, minute, second) do
-          :ok ->
-            base_time = "#{hour}:#{minute}:#{second}"
+      <<hour::binary-size(2), ":", minute::binary-size(2), ":", second::binary-size(2), ".", fraction::binary>> ->
+        normalize_time(hour, minute, second, fraction, spec)
 
-            time =
-              cond do
-                fraction == "" ->
-                  base_time
-
-                spec == :"1.0.0" ->
-                  base_time <> "." <> String.pad_trailing(fraction, 3, "0")
-
-                true ->
-                  base_time <> "." <> fraction
-              end
-
-            {:ok, time}
-
-          _ ->
-            :error
-        end
-
-      nil ->
+      _ ->
         :error
+    end
+  end
+
+  defp normalize_time(hour, minute, second, fraction, spec) do
+    with :ok <- validate_time(hour, minute, second) do
+      base_time = "#{hour}:#{minute}:#{second}"
+
+      cond do
+        fraction == "" -> {:ok, base_time}
+        spec == :"1.0.0" -> {:ok, base_time <> "." <> String.pad_trailing(fraction, 3, "0")}
+        true -> {:ok, base_time <> "." <> fraction}
+      end
     end
   end
 
