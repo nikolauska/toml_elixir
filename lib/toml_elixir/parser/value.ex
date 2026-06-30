@@ -42,7 +42,8 @@ defmodule TomlElixir.Parser.Value do
   defp float_candidate?(token), do: :binary.match(token, [".", "e", "E"]) != :nomatch
 
   defp datetime_candidate?(<<_::binary-size(4), ?-, _::binary>>), do: true
-  defp datetime_candidate?(token), do: :binary.match(token, ":") != :nomatch
+  defp datetime_candidate?(<<_::binary-size(2), ?:, _::binary>>), do: true
+  defp datetime_candidate?(_token), do: false
 
   defp parse_integer(token) do
     {sign, rest} =
