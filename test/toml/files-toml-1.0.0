@@ -569,6 +569,8 @@ valid/datetime/local-time.json
 valid/datetime/local-time.toml
 valid/datetime/milliseconds.json
 valid/datetime/milliseconds.toml
+valid/datetime/negative-zero-offset.json
+valid/datetime/negative-zero-offset.toml
 valid/datetime/timezone.json
 valid/datetime/timezone.toml
 valid/empty-crlf.json

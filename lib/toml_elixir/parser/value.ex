@@ -244,6 +244,8 @@ defmodule TomlElixir.Parser.Value do
     end
   end
 
+  defp normalize_offset("-00:00"), do: {:ok, "Z"}
+
   defp normalize_offset(offset) do
     if offset in ["Z", "z"] do
       {:ok, "Z"}
