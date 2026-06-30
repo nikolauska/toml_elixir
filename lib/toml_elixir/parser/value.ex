@@ -245,9 +245,9 @@ defmodule TomlElixir.Parser.Value do
   end
 
   defp validate_date(date) do
-    [year, month, day] = date |> String.split("-") |> Enum.map(&String.to_integer/1)
+    <<year::binary-size(4), "-", month::binary-size(2), "-", day::binary-size(2)>> = date
 
-    case Date.new(year, month, day) do
+    case Date.new(:erlang.binary_to_integer(year), :erlang.binary_to_integer(month), :erlang.binary_to_integer(day)) do
       {:ok, _date} -> :ok
       _ -> :error
     end
