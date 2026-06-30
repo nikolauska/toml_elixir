@@ -136,8 +136,9 @@ mix test
 # Run coverage report
 mix coveralls
 
-# Run decode and encode benchmarks
-mix run bench/encode_decode.exs
+# Run decode and encode benchmarks separately (time, memory, and reductions)
+mix run bench/decode.exs
+mix run bench/encode.exs
 ```
 
 ## License
