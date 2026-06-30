@@ -95,44 +95,14 @@ defmodule TomlElixir.Parser.Value do
   end
 
   defp parse_standard_float(token, _spec) do
-    # Regex captures:
-    # 1. sign
-    # 2. integer part
-    # 3. fractional part (optional)
-    # 4. exponent sign (optional)
-    # 5. exponent digits (optional)
     regex =
-      ~r/\A(?<sign>[+-]?)(?<int>0|[1-9][0-9_]*)(?:\.(?<frac>[0-9_]+))?(?:[eE](?<exp_sign>[+-]?)(?<exp>[0-9_]+))?\z/
+      ~r/\A[+-]?(?:0|[1-9](?:_?[0-9])*)(?:\.[0-9](?:_?[0-9])*)?(?:[eE][+-]?[0-9](?:_?[0-9])*)?\z/
 
-    case Regex.named_captures(regex, token) do
-      %{"sign" => _sign, "int" => int, "frac" => frac, "exp_sign" => _exp_sign, "exp" => exp} ->
-        # Regex.named_captures returns "" for unmatched groups
-        frac = if frac == "", do: nil, else: frac
-        exp = if exp == "", do: nil, else: exp
-
-        has_exp = exp != nil
-        has_frac = frac != nil
-
-        if not has_exp and not has_frac do
-          :error
-        else
-          with :ok <- validate_underscores(int),
-               :ok <- validate_underscores(frac || ""),
-               :ok <- validate_underscores(exp || ""),
-               :ok <- validate_leading_zero(remove_underscores(int), 10) do
-            value = token |> remove_underscores() |> Float.parse()
-
-            case value do
-              {float, ""} -> {:ok, float}
-              _ -> :error
-            end
-          else
-            _ -> :error
-          end
-        end
-
-      nil ->
-        :error
+    with true <- Regex.match?(regex, token),
+         {float, ""} <- token |> remove_underscores() |> Float.parse() do
+      {:ok, float}
+    else
+      _ -> :error
     end
   end
 
