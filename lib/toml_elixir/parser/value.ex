@@ -109,15 +109,7 @@ defmodule TomlElixir.Parser.Value do
 
   defp parse_datetime(token, spec) do
     cond do
-      captures =
-          Regex.run(
-            if(spec == :"1.1.0",
-              do: ~r/\A(\d{4}-\d{2}-\d{2})[Tt ](\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)(Z|z|[+-]\d{2}:\d{2})\z/,
-              else: ~r/\A(\d{4}-\d{2}-\d{2})[Tt ](\d{2}:\d{2}:\d{2}(?:\.\d+)?)(Z|z|[+-]\d{2}:\d{2})\z/
-            ),
-            token,
-            capture: :all_but_first
-          ) ->
+      captures = offset_datetime_captures(token, spec) ->
         [date, time, offset] = captures
 
         with :ok <- validate_date(date),
@@ -131,15 +123,7 @@ defmodule TomlElixir.Parser.Value do
           _ -> :error
         end
 
-      captures =
-          Regex.run(
-            if(spec == :"1.1.0",
-              do: ~r/\A(\d{4}-\d{2}-\d{2})[Tt ](\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)\z/,
-              else: ~r/\A(\d{4}-\d{2}-\d{2})[Tt ](\d{2}:\d{2}:\d{2}(?:\.\d+)?)\z/
-            ),
-            token,
-            capture: :all_but_first
-          ) ->
+      captures = local_datetime_captures(token, spec) ->
         [date, time] = captures
 
         with :ok <- validate_date(date),
@@ -152,7 +136,7 @@ defmodule TomlElixir.Parser.Value do
           _ -> :error
         end
 
-      Regex.match?(~r/\A\d{4}-\d{2}-\d{2}\z/, token) ->
+      byte_size(token) == 10 and Regex.match?(~r/\A\d{4}-\d{2}-\d{2}\z/, token) ->
         case Date.from_iso8601(token) do
           {:ok, date} -> {:ok, date}
           _ -> :error
@@ -180,6 +164,44 @@ defmodule TomlElixir.Parser.Value do
         :error
     end
   end
+
+  defp offset_datetime_captures(token, spec) do
+    if offset_datetime_candidate?(token) do
+      Regex.run(
+        if(spec == :"1.1.0",
+          do: ~r/\A(\d{4}-\d{2}-\d{2})[Tt ](\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)(Z|z|[+-]\d{2}:\d{2})\z/,
+          else: ~r/\A(\d{4}-\d{2}-\d{2})[Tt ](\d{2}:\d{2}:\d{2}(?:\.\d+)?)(Z|z|[+-]\d{2}:\d{2})\z/
+        ),
+        token,
+        capture: :all_but_first
+      )
+    end
+  end
+
+  defp local_datetime_captures(token, spec) do
+    if local_datetime_candidate?(token) do
+      Regex.run(
+        if(spec == :"1.1.0",
+          do: ~r/\A(\d{4}-\d{2}-\d{2})[Tt ](\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)\z/,
+          else: ~r/\A(\d{4}-\d{2}-\d{2})[Tt ](\d{2}:\d{2}:\d{2}(?:\.\d+)?)\z/
+        ),
+        token,
+        capture: :all_but_first
+      )
+    end
+  end
+
+  defp offset_datetime_candidate?(<<_::binary-size(10), separator, rest::binary>>) when separator in [?T, ?t, ?\s] do
+    size = byte_size(rest)
+
+    (size > 0 and :binary.last(rest) in [?Z, ?z]) or
+      (size >= 6 and :binary.at(rest, size - 6) in [?+, ?-])
+  end
+
+  defp offset_datetime_candidate?(_token), do: false
+
+  defp local_datetime_candidate?(<<_::binary-size(10), separator, _::binary>>) when separator in [?T, ?t, ?\s], do: true
+  defp local_datetime_candidate?(_token), do: false
 
   defp normalize_time(time, spec) do
     case time do
