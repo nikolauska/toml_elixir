@@ -114,22 +114,24 @@ defmodule TomlElixir.Parser.Document do
   defp parse_key_part(%State{} = state) do
     state = skip_spaces(state)
 
-    cond do
-      State.peek_prefix?(state, "\"\"\"") ->
-        Error.raise("Multiline strings are not allowed in keys")
+    case State.peek_byte(state) do
+      ?" ->
+        if State.peek_prefix?(state, "\"\"\"") do
+          Error.raise("Multiline strings are not allowed in keys")
+        end
 
-      State.peek_prefix?(state, "'''") ->
-        Error.raise("Multiline strings are not allowed in keys")
-
-      State.peek_prefix?(state, "\"") ->
         {value, state} = Strings.parse_basic(state, false)
         {state, value}
 
-      State.peek_prefix?(state, "'") ->
+      ?' ->
+        if State.peek_prefix?(state, "'''") do
+          Error.raise("Multiline strings are not allowed in keys")
+        end
+
         {value, state} = Strings.parse_literal(state, false)
         {state, value}
 
-      true ->
+      _ ->
         {token, state} = take_bare_key(state)
 
         if token == "" do
@@ -141,32 +143,24 @@ defmodule TomlElixir.Parser.Document do
   end
 
   defp parse_value(%State{} = state, inline?) do
-    cond do
-      State.peek_prefix?(state, "\"\"\"") ->
-        {value, state} = Strings.parse_basic(state, true)
+    case State.peek_byte(state) do
+      ?" ->
+        {value, state} = Strings.parse_basic(state, State.peek_prefix?(state, "\"\"\""))
         {state, value}
 
-      State.peek_prefix?(state, "'''") ->
-        {value, state} = Strings.parse_literal(state, true)
+      ?' ->
+        {value, state} = Strings.parse_literal(state, State.peek_prefix?(state, "'''"))
         {state, value}
 
-      State.peek_prefix?(state, "\"") ->
-        {value, state} = Strings.parse_basic(state, false)
-        {state, value}
-
-      State.peek_prefix?(state, "'") ->
-        {value, state} = Strings.parse_literal(state, false)
-        {state, value}
-
-      State.peek_prefix?(state, "[") ->
+      ?[ ->
         {state, value} = parse_array(state, inline?)
         {state, value}
 
-      State.peek_prefix?(state, "{") ->
+      ?{ ->
         {state, value} = parse_inline_table(state)
         {state, value}
 
-      true ->
+      _ ->
         {token, state} = take_value_token(state)
 
         {token, state} =
