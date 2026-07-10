@@ -46,10 +46,16 @@ defmodule TomlElixir.Parser.State do
     if index >= byte_size(input) do
       {nil, state}
     else
-      <<_::binary-size(^index), rest::binary>> = input
-      <<codepoint::utf8, tail::binary>> = rest
-      size = byte_size(rest) - byte_size(tail)
-      {codepoint, %{state | index: index + size}}
+      case :binary.at(input, index) do
+        byte when byte < 0x80 ->
+          {byte, %{state | index: index + 1}}
+
+        _ ->
+          <<_::binary-size(^index), rest::binary>> = input
+          <<codepoint::utf8, tail::binary>> = rest
+          size = byte_size(rest) - byte_size(tail)
+          {codepoint, %{state | index: index + size}}
+      end
     end
   end
 
