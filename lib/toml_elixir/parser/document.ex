@@ -291,7 +291,11 @@ defmodule TomlElixir.Parser.Document do
   end
 
   defp skip_spaces(%State{input: input, index: index} = state) do
-    %{state | index: skip_space_index(input, index)}
+    if index < byte_size(input) and :binary.at(input, index) in [?\s, ?\t] do
+      %{state | index: skip_space_index(input, index + 1)}
+    else
+      state
+    end
   end
 
   defp skip_space_index(input, index) when index < byte_size(input) do
