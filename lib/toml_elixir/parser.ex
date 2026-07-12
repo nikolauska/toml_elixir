@@ -18,9 +18,11 @@ defmodule TomlElixir.Parser do
   end
 
   defp normalize_input(str) do
-    if not String.valid?(str) do
-      Error.raise("Invalid UTF-8")
-    end
+    str =
+      case :unicode.characters_to_binary(str) do
+        valid when is_binary(valid) -> valid
+        _ -> Error.raise("Invalid UTF-8")
+      end
 
     {str, had_bom?} =
       case str do

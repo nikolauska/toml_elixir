@@ -6,8 +6,8 @@
 
 ### Performance
 
-* **Faster Decoding**: Reduced median decode time for `bench/fixtures/5mb-mixed.toml` from 942.47 ms to 571.90 ms and for `bench/fixtures/example.toml` from 437.65 μs to 316.10 μs. Reductions fell from 32.87 M to 26.94 M and from 31.37 K to 28.33 K, respectively.
-* **Lower Memory Usage**: Reduced measured decode allocations for `bench/fixtures/5mb-mixed.toml` from 288.90 MB to 173.70 MB and for `bench/fixtures/example.toml` from 322.03 KB to 195.69 KB.
+* **Faster Decoding**: Reduced median decode time for `bench/fixtures/5mb-mixed.toml` from 942.47 ms to 571.90 ms and for `bench/fixtures/example.toml` from 437.65 μs to 306.79 μs. Native UTF-8 validation reduced reductions from 32.87 M to 22.02 M and from 31.37 K to 23.08 K, respectively.
+* **Lower Memory Usage**: Reduced measured decode allocations for `bench/fixtures/5mb-mixed.toml` from 288.90 MB to 173.70 MB and for `bench/fixtures/example.toml` from 322.03 KB to 195.65 KB.
 
 ## 3.1.0 (2026-02-15)
 
