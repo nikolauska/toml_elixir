@@ -426,7 +426,7 @@ defmodule TomlElixir.Parser.Document do
   defp take_value_token(%State{input: input, index: index} = state) do
     rest = :binary.part(input, index, byte_size(input) - index)
     length = value_token_length(rest, 0)
-    token = input |> :binary.part(index, length) |> :binary.copy()
+    token = :binary.part(input, index, length)
     {token, %{state | index: index + length}}
   end
 
