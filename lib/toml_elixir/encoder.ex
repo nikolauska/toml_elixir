@@ -92,10 +92,34 @@ defmodule TomlElixir.Encoder.Helpers do
   end
 
   def escape_string(str) do
-    str
-    |> String.to_charlist()
-    |> Enum.map(&escape_char/1)
+    escape_string(str, str, 0, 0, [])
+  end
+
+  defp escape_string(<<char, rest::binary>>, original, start, length, acc) when char < 0x20 or char in [?\\, ?", 0x7F] do
+    segment = binary_part(original, start, length)
+    escape_string(rest, original, start + length + 1, 0, [escape_char(char), segment | acc])
+  end
+
+  defp escape_string(<<char, rest::binary>>, original, start, length, acc) when char < 0x80 do
+    escape_string(rest, original, start, length + 1, acc)
+  end
+
+  defp escape_string(<<char::utf8, rest::binary>>, original, start, length, acc) do
+    escape_string(rest, original, start, length + byte_size(<<char::utf8>>), acc)
+  end
+
+  defp escape_string("", original, _start, _length, []), do: original
+
+  defp escape_string("", original, start, length, acc) do
+    # Keep unchanged spans intact instead of allocating an output entry for every codepoint.
+    [binary_part(original, start, length) | acc]
+    |> Enum.reverse()
     |> IO.iodata_to_binary()
+  end
+
+  defp escape_string(_rest, original, _start, _length, _acc) do
+    # Preserve the existing conversion error for malformed UTF-8 and non-binary bitstrings.
+    original |> String.to_charlist() |> Enum.map(&escape_char/1) |> IO.iodata_to_binary()
   end
 
   defp escape_char(?\\), do: "\\\\"
@@ -287,29 +311,25 @@ defmodule TomlElixir.Encoder.Serializer do
     # Then sub-tables and array of tables
     complex_lines =
       Enum.map(complex, fn {k, v} ->
-        raw_key = to_string(k)
-        # credo:disable-for-next-line Credo.Check.Refactor.AppendSingleItem
-        new_path = path ++ [raw_key]
+        key = Helpers.encode_key(k)
+        # Reuse escaped parent segments across siblings and array entries.
+        new_path = if path == [], do: key, else: [path, ".", key]
 
         cond do
           array_of_maps?(v) ->
-            path_str = Enum.map_join(new_path, ".", &Helpers.encode_key/1)
-
             Enum.map(v, fn item ->
               [
                 "\n[[",
-                path_str,
+                new_path,
                 "]]\n",
                 encode_map(item, new_path)
               ]
             end)
 
           map_like?(v) ->
-            path_str = Enum.map_join(new_path, ".", &Helpers.encode_key/1)
-
             [
               "\n[",
-              path_str,
+              new_path,
               "]\n",
               encode_map(v, new_path)
             ]

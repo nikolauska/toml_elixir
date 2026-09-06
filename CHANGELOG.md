@@ -6,8 +6,10 @@
 
 ### Performance
 
-* **Faster Decoding**: Reduced median decode time for `bench/fixtures/5mb-mixed.toml` from 942.47 ms to 569.42 ms and for `bench/fixtures/example.toml` from 437.65 μs to 301.39 μs. Native UTF-8 validation, whitespace dispatch, and zero-copy scalar parsing reduced reductions from 32.87 M to 21.05 M and from 31.37 K to 21.48 K, respectively.
-* **Lower Memory Usage**: Reduced measured decode allocations for `bench/fixtures/5mb-mixed.toml` from 288.90 MB to 171.85 MB and for `bench/fixtures/example.toml` from 322.03 KB to 194.70 KB.
+* **Faster Decoding**: Compared with 3.1.0, reduced median decode time for the zero-offset-normalized 5 MB fixture from 2.85 s to 557.95 ms and for `bench/fixtures/example.toml` from 0.99 ms to 288.45 μs. Reduction counts decreased from 99.39 M to 20.64 M and from 99.54 K to 21.01 K, respectively.
+* **Lower Decode Allocations**: Compared with 3.1.0, reduced allocations for the zero-offset-normalized 5 MB fixture from 1.31 GB to 169.87 MB and for the example fixture from 1.33 MB to 191.95 KB.
+* **Faster Encoding**: Compared with 3.1.0, reduced median encoding time for `bench/fixtures/5mb-mixed.toml` from 452.39 ms to 306.51 ms and allocations from 245.24 MB to 61.50 MB. The example fixture decreased from 186.15 μs to 137.74 μs, with allocations decreasing from 85.28 KB to 52.84 KB.
+* **Faster Integer Decoding**: Compared with 3.1.0, reduced median decode time for a 2,000-integer document from 28.92 ms to 3.97 ms and allocations from 17.02 MB to 2.89 MB.
 
 ## 3.1.0 (2026-02-15)
 

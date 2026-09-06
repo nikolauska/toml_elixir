@@ -63,11 +63,11 @@ defmodule TomlElixir.Parser.Value do
     if sign != nil and base != 10 do
       :error
     else
-      with :ok <- validate_underscores(digits),
-           digits = remove_underscores(digits),
+      with {:ok, digits} <- integer_digits(digits),
            :ok <- validate_digits(digits, base),
            :ok <- validate_leading_zero(digits, base),
-           {int, ""} <- Integer.parse(digits, base) do
+           false <- digits == "" do
+        int = :erlang.binary_to_integer(digits, base)
         value = if sign == ?-, do: -int, else: int
         {:ok, value}
       else
@@ -270,14 +270,17 @@ defmodule TomlElixir.Parser.Value do
 
   defp validate_leading_zero(_digits, _base), do: :ok
 
-  defp validate_underscores(""), do: :ok
+  defp integer_digits(digits) do
+    case :binary.match(digits, "_") do
+      :nomatch ->
+        {:ok, digits}
 
-  defp validate_underscores(digits) do
-    cond do
-      String.starts_with?(digits, "_") -> :error
-      String.ends_with?(digits, "_") -> :error
-      String.contains?(digits, "__") -> :error
-      true -> :ok
+      {index, _} ->
+        if index == 0 or :binary.last(digits) == ?_ or String.contains?(digits, "__") do
+          :error
+        else
+          {:ok, String.replace(digits, "_", "")}
+        end
     end
   end
 
