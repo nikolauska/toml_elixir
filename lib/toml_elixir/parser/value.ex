@@ -266,7 +266,9 @@ defmodule TomlElixir.Parser.Value do
   defp normalize_offset(offset) when offset in ["Z", "z"], do: {:ok, "Z"}
 
   defp normalize_offset(<<sign, h1, h2, ?:, m1, m2>> = offset)
-       when sign in [?+, ?-] and h1 in ?0..?9 and h2 in ?0..?9 and m1 in ?0..?9 and m2 in ?0..?9, do: {:ok, offset}
+       when sign in [?+, ?-] and h1 in ?0..?9 and h2 in ?0..?9 and m1 in ?0..?9 and m2 in ?0..?9 do
+    {:ok, offset}
+  end
 
   defp normalize_offset(_offset), do: :error
 
