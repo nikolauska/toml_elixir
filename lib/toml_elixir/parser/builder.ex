@@ -5,30 +5,33 @@ defmodule TomlElixir.Parser.Builder do
   alias TomlElixir.Parser.Error
   alias TomlElixir.Parser.Table
 
-  defstruct root: Table.new(), current: []
+  # `table` is the table addressed by the latest header, detached from `root`. Key/value
+  # lines only touch it, so they avoid rewriting every map from the root on each insert;
+  # `root` has a stale copy at `current` until `close/1` writes `table` back.
+  defstruct root: nil, current: [], table: Table.new()
 
-  @type t :: %__MODULE__{root: Table.t(), current: [String.t()]}
+  @type t :: %__MODULE__{root: Table.t() | nil, current: [String.t()], table: Table.t()}
 
   @spec new() :: t
   def new, do: %__MODULE__{}
 
   @spec define_table(t, [String.t()]) :: t
   def define_table(%__MODULE__{} = builder, path) do
-    root = ensure_table(builder.root, path, explicit: true)
-    %{builder | root: root, current: path}
+    root = builder |> close() |> ensure_table(path, explicit: true)
+    %{builder | root: root, current: path, table: fetch_table(root, path)}
   end
 
   @spec define_array_table(t, [String.t()]) :: t
   def define_array_table(%__MODULE__{} = builder, path) do
-    root = ensure_array_table(builder.root, path)
-    %{builder | root: root, current: path}
+    root = builder |> close() |> ensure_array_table(path)
+    %{builder | root: root, current: path, table: fetch_table(root, path)}
   end
 
   @spec put_value(t, [String.t()], any) :: t
   def put_value(%__MODULE__{} = builder, path, value) do
-    depth = length(builder.current)
-    root = put_value_in(builder.root, builder.current ++ path, value, false, depth)
-    %{builder | root: root}
+    # Header segments were validated when the header was defined, so only the dotted
+    # key segments below the open table need checking.
+    %{builder | table: put_value_in(builder.table, path, value, false)}
   end
 
   @spec inline_table() :: Table.t()
@@ -38,12 +41,38 @@ defmodule TomlElixir.Parser.Builder do
 
   @spec put_inline_value(Table.t(), [String.t()], any) :: Table.t()
   def put_inline_value(%Table{} = table, path, value) do
-    put_value_in(table, path, value, true, 0)
+    put_value_in(table, path, value, true)
   end
 
   @spec to_map(t) :: map
-  def to_map(%__MODULE__{root: root}) do
-    Table.to_map(root)
+  def to_map(%__MODULE__{} = builder) do
+    builder |> close() |> Table.to_map()
+  end
+
+  defp close(%__MODULE__{root: nil, table: table}), do: table
+  defp close(%__MODULE__{root: root, current: path, table: table}), do: replace_table(root, path, table)
+
+  # Headers resolve through the most recent entry of an array of tables, matching
+  # the navigation used by `ensure_table/3` and `ensure_array_table/3`.
+  defp fetch_table(%Table{} = table, []), do: table
+
+  defp fetch_table(%Table{data: data}, [key | tail]) do
+    case Map.fetch!(data, key) do
+      %Table{} = child -> fetch_table(child, tail)
+      %ArrayTable{items: [last | _]} -> fetch_table(last, tail)
+    end
+  end
+
+  defp replace_table(%Table{}, [], table), do: table
+
+  defp replace_table(%Table{data: data} = parent, [key | tail], table) do
+    child =
+      case Map.fetch!(data, key) do
+        %Table{} = child -> replace_table(child, tail, table)
+        %ArrayTable{items: [last | rest]} -> %ArrayTable{items: [replace_table(last, tail, table) | rest]}
+      end
+
+    %{parent | data: Map.put(data, key, child)}
   end
 
   defp ensure_table(%Table{} = table, [], _opts), do: table
@@ -167,11 +196,11 @@ defmodule TomlElixir.Parser.Builder do
     end
   end
 
-  defp put_value_in(%Table{} = table, [], _value, _allow_inline?, _depth) do
+  defp put_value_in(%Table{} = table, [], _value, _allow_inline?) do
     table
   end
 
-  defp put_value_in(%Table{} = table, [key], value, allow_inline?, _depth) do
+  defp put_value_in(%Table{} = table, [key], value, allow_inline?) do
     assert_mutable!(table, allow_inline?)
 
     if Map.has_key?(table.data, key) do
@@ -181,40 +210,29 @@ defmodule TomlElixir.Parser.Builder do
     end
   end
 
-  defp put_value_in(%Table{} = table, [key | tail], value, allow_inline?, depth) do
+  # Every segment handled here is a dotted key segment: callers start at the open header
+  # table or at an inline table, never above it.
+  defp put_value_in(%Table{} = table, [key | tail], value, allow_inline?) do
     assert_mutable!(table, allow_inline?)
 
     case Map.fetch(table.data, key) do
       :error ->
         child = Table.new(allow_inline?, false, not allow_inline?)
-        updated_child = put_value_in(child, tail, value, allow_inline?, depth - 1)
+        updated_child = put_value_in(child, tail, value, allow_inline?)
         %{table | data: Map.put(table.data, key, updated_child)}
 
       {:ok, %Table{} = existing} ->
         assert_mutable!(existing, allow_inline?)
 
-        if not allow_inline? and depth <= 0 and existing.explicit? do
-          Error.raise("Table #{Enum.join([key], ".")} cannot be modified via dotted keys")
+        if not allow_inline? and existing.explicit? do
+          Error.raise("Table #{key} cannot be modified via dotted keys")
         end
 
-        updated_child = put_value_in(existing, tail, value, allow_inline?, depth - 1)
+        updated_child = put_value_in(existing, tail, value, allow_inline?)
         %{table | data: Map.put(table.data, key, updated_child)}
 
-      {:ok, %ArrayTable{items: items}} ->
-        if depth <= 0 do
-          Error.raise("Table #{Enum.join([key], ".")} already defined as array")
-        end
-
-        case items do
-          [] ->
-            Error.raise("Array of tables #{key} is empty")
-
-          [%Table{} = last | rest] ->
-            assert_mutable!(last, allow_inline?)
-            updated_last = put_value_in(last, tail, value, allow_inline?, depth - 1)
-            updated_items = [updated_last | rest]
-            %{table | data: Map.put(table.data, key, %ArrayTable{items: updated_items})}
-        end
+      {:ok, %ArrayTable{}} ->
+        Error.raise("Table #{key} already defined as array")
 
       {:ok, _value} ->
         Error.raise("Key #{Enum.join([key | tail], ".")} is not a table")

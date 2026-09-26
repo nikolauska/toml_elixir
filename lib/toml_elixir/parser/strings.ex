@@ -4,209 +4,159 @@ defmodule TomlElixir.Parser.Strings do
   alias TomlElixir.Parser.Error
   alias TomlElixir.Parser.State
 
-  @spec parse_basic(State.t(), boolean) :: {binary, State.t()}
-  def parse_basic(%State{} = state, multiline?) do
-    state =
+  @spec parse_basic(State.t(), State.pos(), boolean) :: {binary, State.pos()}
+  def parse_basic(%State{} = state, pos, multiline?) do
+    pos =
       if multiline? do
-        ensure_prefix!(state, "\"\"\"")
-        State.consume_prefix(state, "\"\"\"")
+        ensure_prefix!(state, pos, "\"\"\"")
+        trim_initial_newline(state, pos + 3)
       else
-        ensure_prefix!(state, "\"")
-        State.consume_prefix(state, "\"")
+        ensure_prefix!(state, pos, "\"")
+        pos + 1
       end
 
-    state =
-      if multiline? do
-        trim_initial_newline(state)
-      else
-        state
-      end
-
-    {content, state} = parse_basic_content(state, multiline?, [])
-    {content, state}
+    parse_basic_content(state, pos, multiline?, [])
   end
 
-  @spec parse_literal(State.t(), boolean) :: {binary, State.t()}
-  def parse_literal(%State{} = state, multiline?) do
-    state =
+  @spec parse_literal(State.t(), State.pos(), boolean) :: {binary, State.pos()}
+  def parse_literal(%State{} = state, pos, multiline?) do
+    pos =
       if multiline? do
-        ensure_prefix!(state, "'''")
-        State.consume_prefix(state, "'''")
+        ensure_prefix!(state, pos, "'''")
+        trim_initial_newline(state, pos + 3)
       else
-        ensure_prefix!(state, "'")
-        State.consume_prefix(state, "'")
+        ensure_prefix!(state, pos, "'")
+        pos + 1
       end
 
-    state =
-      if multiline? do
-        trim_initial_newline(state)
-      else
-        state
-      end
-
-    {content, state} = parse_literal_content(state, multiline?, [])
-    {content, state}
+    parse_literal_content(state, pos, multiline?, [])
   end
 
-  defp parse_basic_content(%State{} = state, multiline?, acc) do
+  defp parse_basic_content(%State{} = state, pos, multiline?, acc) do
     cond do
-      State.eof?(state) ->
+      State.eof?(state, pos) ->
         Error.raise("Unterminated string")
 
-      multiline? and State.peek_codepoint(state) == ?\" ->
-        count = quote_run_length(state, ?\")
-
-        if count >= 3 do
-          to_consume = if count >= 6, do: 3, else: count
-          state = State.consume_prefix(state, String.duplicate("\"", to_consume))
-          extra = to_consume - 3
-          acc = if extra > 0, do: [String.duplicate("\"", extra) | acc], else: acc
-          {IO.iodata_to_binary(Enum.reverse(acc)), state}
-        else
-          {codepoint, state} = State.next_codepoint(state)
-          parse_basic_content(state, multiline?, [<<codepoint::utf8>> | acc])
+      multiline? and State.peek_byte(state, pos) == ?\" ->
+        case count_quote_run(state, pos, ?\", 0) do
+          count when count >= 3 -> close_multiline(pos, count, "\"", acc)
+          _count -> parse_basic_content(state, pos + 1, multiline?, ["\"" | acc])
         end
 
-      not multiline? and State.peek_prefix?(state, "\"") ->
-        {IO.iodata_to_binary(Enum.reverse(acc)), State.consume_prefix(state, "\"")}
+      not multiline? and State.peek_byte(state, pos) == ?\" ->
+        {finish(acc), pos + 1}
 
-      result = take_basic_segment(state) ->
-        {segment, state} = result
-        parse_basic_content(state, multiline?, [segment | acc])
+      segment = take_basic_segment(state, pos) ->
+        parse_basic_content(state, pos + byte_size(segment), multiline?, [segment | acc])
 
       true ->
-        {codepoint, state} = State.next_codepoint(state)
+        # Segments stop only at ASCII delimiters and control bytes, so one byte is the
+        # whole character here.
+        case State.peek_byte(state, pos) do
+          ?\n when multiline? ->
+            parse_basic_content(state, pos + 1, multiline?, ["\n" | acc])
 
-        cond do
-          codepoint == ?\n ->
-            if multiline? do
-              parse_basic_content(state, multiline?, ["\n" | acc])
-            else
-              Error.raise("Newline in basic string")
-            end
+          ?\r when multiline? ->
+            parse_basic_content(state, crlf_end(state, pos), multiline?, ["\n" | acc])
 
-          codepoint == ?\r ->
-            if multiline? do
-              state =
-                if State.peek_prefix?(state, "\n") do
-                  State.consume_prefix(state, "\n")
-                else
-                  Error.raise("Bare carriage return")
-                end
+          newline when newline in [?\n, ?\r] ->
+            Error.raise("Newline in basic string")
 
-              parse_basic_content(state, multiline?, ["\n" | acc])
-            else
-              Error.raise("Newline in basic string")
-            end
+          ?\\ ->
+            {segment, pos} = parse_basic_escape(state, pos + 1, multiline?)
+            parse_basic_content(state, pos, multiline?, [segment | acc])
 
-          codepoint == ?\\ ->
-            {segment, state} = parse_basic_escape(state, multiline?)
-            parse_basic_content(state, multiline?, [segment | acc])
-
-          control_char?(codepoint) ->
+          _control ->
             Error.raise("Control character in string")
-
-          true ->
-            parse_basic_content(state, multiline?, [<<codepoint::utf8>> | acc])
         end
     end
   end
 
-  defp parse_literal_content(%State{} = state, multiline?, acc) do
+  defp parse_literal_content(%State{} = state, pos, multiline?, acc) do
     cond do
-      State.eof?(state) ->
+      State.eof?(state, pos) ->
         Error.raise("Unterminated literal string")
 
-      multiline? and State.peek_codepoint(state) == ?' ->
-        count = quote_run_length(state, ?')
-
-        if count >= 3 do
-          to_consume = if count >= 6, do: 3, else: count
-          state = State.consume_prefix(state, String.duplicate("'", to_consume))
-          extra = to_consume - 3
-          acc = if extra > 0, do: [String.duplicate("'", extra) | acc], else: acc
-          {IO.iodata_to_binary(Enum.reverse(acc)), state}
-        else
-          {codepoint, state} = State.next_codepoint(state)
-          parse_literal_content(state, multiline?, [<<codepoint::utf8>> | acc])
+      multiline? and State.peek_byte(state, pos) == ?' ->
+        case count_quote_run(state, pos, ?', 0) do
+          count when count >= 3 -> close_multiline(pos, count, "'", acc)
+          _count -> parse_literal_content(state, pos + 1, multiline?, ["'" | acc])
         end
 
-      not multiline? and State.peek_prefix?(state, "'") ->
-        {IO.iodata_to_binary(Enum.reverse(acc)), State.consume_prefix(state, "'")}
+      not multiline? and State.peek_byte(state, pos) == ?' ->
+        {finish(acc), pos + 1}
 
-      result = take_literal_segment(state) ->
-        {segment, state} = result
-        parse_literal_content(state, multiline?, [segment | acc])
+      segment = take_literal_segment(state, pos) ->
+        parse_literal_content(state, pos + byte_size(segment), multiline?, [segment | acc])
 
       true ->
-        {codepoint, state} = State.next_codepoint(state)
+        # Segments stop only at ASCII delimiters and control bytes, so one byte is the
+        # whole character here.
+        case State.peek_byte(state, pos) do
+          ?\n when multiline? ->
+            parse_literal_content(state, pos + 1, multiline?, ["\n" | acc])
 
-        cond do
-          codepoint == ?\n ->
-            if multiline? do
-              parse_literal_content(state, multiline?, ["\n" | acc])
-            else
-              Error.raise("Newline in literal string")
-            end
+          ?\r when multiline? ->
+            parse_literal_content(state, crlf_end(state, pos), multiline?, ["\n" | acc])
 
-          codepoint == ?\r ->
-            if multiline? do
-              state =
-                if State.peek_prefix?(state, "\n") do
-                  State.consume_prefix(state, "\n")
-                else
-                  Error.raise("Bare carriage return")
-                end
+          newline when newline in [?\n, ?\r] ->
+            Error.raise("Newline in literal string")
 
-              parse_literal_content(state, multiline?, ["\n" | acc])
-            else
-              Error.raise("Newline in literal string")
-            end
-
-          control_char?(codepoint) ->
+          _control ->
             Error.raise("Control character in literal string")
-
-          true ->
-            parse_literal_content(state, multiline?, [<<codepoint::utf8>> | acc])
         end
     end
   end
 
-  defp parse_basic_escape(%State{} = state, multiline?) do
-    case State.peek_codepoint(state) do
+  # Up to two quotes directly before the closing delimiter belong to the content.
+  defp close_multiline(pos, count, quote, acc) do
+    to_consume = if count >= 6, do: 3, else: count
+    extra = to_consume - 3
+    acc = if extra > 0, do: [String.duplicate(quote, extra) | acc], else: acc
+    {finish(acc), pos + to_consume}
+  end
+
+  # Segments are sub-binaries of the whole document; copying keeps decoded values from
+  # holding the input binary alive.
+  defp finish([]), do: ""
+  defp finish([segment]), do: :binary.copy(segment)
+  defp finish(acc), do: acc |> Enum.reverse() |> IO.iodata_to_binary()
+
+  defp parse_basic_escape(%State{} = state, pos, multiline?) do
+    case State.peek_byte(state, pos) do
       ?b ->
-        {<<0x08>>, State.consume_prefix(state, "b")}
+        {<<0x08>>, pos + 1}
 
       ?t ->
-        {"\t", State.consume_prefix(state, "t")}
+        {"\t", pos + 1}
 
       ?n ->
-        {"\n", State.consume_prefix(state, "n")}
+        {"\n", pos + 1}
 
       ?e ->
-        {<<0x1B>>, State.consume_prefix(state, "e")}
+        {<<0x1B>>, pos + 1}
 
       ?f ->
-        {<<0x0C>>, State.consume_prefix(state, "f")}
+        {<<0x0C>>, pos + 1}
 
       ?r ->
-        {"\r", State.consume_prefix(state, "r")}
+        {"\r", pos + 1}
 
       ?\" ->
-        {"\"", State.consume_prefix(state, "\"")}
+        {"\"", pos + 1}
 
       ?\\ ->
-        {"\\", State.consume_prefix(state, "\\")}
+        {"\\", pos + 1}
 
       ?u ->
-        parse_unicode_escape(state, 4)
+        parse_unicode_escape(state, pos + 1, 4)
 
       ?U ->
-        parse_unicode_escape(state, 8)
+        parse_unicode_escape(state, pos + 1, 8)
 
       ?x ->
         if state.spec == :"1.1.0" do
-          parse_unicode_escape(state, 2)
+          parse_unicode_escape(state, pos + 1, 2)
         else
           Error.raise("Invalid escape sequence")
         end
@@ -215,60 +165,47 @@ defmodule TomlElixir.Parser.Strings do
         Error.raise("Unterminated escape")
 
       _ when multiline? ->
-        parse_line_continuation(state)
+        parse_line_continuation(state, pos)
 
       _ ->
         Error.raise("Invalid escape sequence")
     end
   end
 
-  defp parse_unicode_escape(%State{} = state, digits) do
-    state = State.consume_prefix(state, <<State.peek_byte(state)>>)
-    {hex, state} = take_exact_hex(state, digits, [])
-    codepoint = String.to_integer(hex, 16)
+  defp parse_unicode_escape(%State{} = state, pos, digits) do
+    codepoint = hex_value(state, pos, digits, 0)
 
     if invalid_codepoint?(codepoint) do
       Error.raise("Invalid Unicode codepoint")
     else
-      {<<codepoint::utf8>>, state}
+      {<<codepoint::utf8>>, pos + digits}
     end
   end
 
-  defp take_exact_hex(%State{} = state, 0, acc) do
-    {IO.iodata_to_binary(Enum.reverse(acc)), state}
-  end
+  defp hex_value(%State{}, _pos, 0, acc), do: acc
 
-  defp take_exact_hex(%State{} = state, remaining, acc) do
-    case State.peek_codepoint(state) do
-      nil ->
-        Error.raise("Unexpected end of unicode escape")
-
-      codepoint ->
-        if hex?(codepoint) do
-          {cp, state} = State.next_codepoint(state)
-          take_exact_hex(state, remaining - 1, [<<cp::utf8>> | acc])
-        else
-          Error.raise("Invalid unicode escape")
-        end
+  defp hex_value(%State{} = state, pos, remaining, acc) do
+    case State.peek_byte(state, pos) do
+      nil -> Error.raise("Unexpected end of unicode escape")
+      digit when digit in ?0..?9 -> hex_value(state, pos + 1, remaining - 1, acc * 16 + digit - ?0)
+      digit when digit in ?A..?F -> hex_value(state, pos + 1, remaining - 1, acc * 16 + digit - ?A + 10)
+      digit when digit in ?a..?f -> hex_value(state, pos + 1, remaining - 1, acc * 16 + digit - ?a + 10)
+      _ -> Error.raise("Invalid unicode escape")
     end
   end
 
-  defp parse_line_continuation(%State{} = state) do
-    {state, saw_space} = consume_spaces_tabs(state)
+  defp parse_line_continuation(%State{} = state, start) do
+    pos = skip_spaces_tabs(state, start)
 
-    case State.peek_codepoint(state) do
+    case State.peek_byte(state, pos) do
       ?\n ->
-        state = consume_newline(state, ?\n)
-        state = consume_all_whitespace(state)
-        {"", state}
+        {"", skip_all_whitespace(state, pos + 1)}
 
       ?\r ->
-        state = consume_newline(state, ?\r)
-        state = consume_all_whitespace(state)
-        {"", state}
+        {"", skip_all_whitespace(state, crlf_end(state, pos))}
 
       _ ->
-        if saw_space do
+        if pos > start do
           Error.raise("Invalid line continuation")
         else
           Error.raise("Invalid escape sequence")
@@ -276,66 +213,48 @@ defmodule TomlElixir.Parser.Strings do
     end
   end
 
-  defp consume_spaces_tabs(%State{} = state) do
-    case State.peek_codepoint(state) do
-      ?\s -> state |> State.consume_prefix(" ") |> consume_spaces_tabs() |> mark_space(true)
-      ?\t -> state |> State.consume_prefix("\t") |> consume_spaces_tabs() |> mark_space(true)
-      _ -> {state, false}
+  defp skip_spaces_tabs(%State{} = state, pos) do
+    case State.peek_byte(state, pos) do
+      char when char in [?\s, ?\t] -> skip_spaces_tabs(state, pos + 1)
+      _ -> pos
     end
   end
 
-  defp mark_space({state, saw?}, _), do: {state, saw? || true}
-  defp mark_space(state, true), do: {state, true}
-
-  defp consume_all_whitespace(%State{} = state) do
-    case State.peek_codepoint(state) do
-      ?\s ->
-        consume_all_whitespace(State.consume_prefix(state, " "))
-
-      ?\t ->
-        consume_all_whitespace(State.consume_prefix(state, "\t"))
-
-      ?\n ->
-        consume_all_whitespace(State.consume_prefix(state, "\n"))
-
-      ?\r ->
-        state = consume_newline(state, ?\r)
-        consume_all_whitespace(state)
-
-      _ ->
-        state
+  defp skip_all_whitespace(%State{} = state, pos) do
+    case State.peek_byte(state, pos) do
+      char when char in [?\s, ?\t, ?\n] -> skip_all_whitespace(state, pos + 1)
+      ?\r -> skip_all_whitespace(state, crlf_end(state, pos))
+      _ -> pos
     end
   end
 
-  defp trim_initial_newline(%State{} = state) do
-    case State.peek_codepoint(state) do
-      ?\n -> State.consume_prefix(state, "\n")
-      ?\r -> consume_newline(state, ?\r)
-      _ -> state
+  defp trim_initial_newline(%State{} = state, pos) do
+    case State.peek_byte(state, pos) do
+      ?\n -> pos + 1
+      ?\r -> crlf_end(state, pos)
+      _ -> pos
     end
   end
 
-  defp consume_newline(%State{} = state, ?\n), do: State.consume_prefix(state, "\n")
-
-  defp consume_newline(%State{} = state, ?\r) do
-    if State.peek_prefix?(state, "\r\n") do
-      State.consume_prefix(state, "\r\n")
+  defp crlf_end(%State{} = state, pos) do
+    if State.peek_prefix?(state, pos, "\r\n") do
+      pos + 2
     else
       Error.raise("Bare carriage return")
     end
   end
 
-  defp ensure_prefix!(%State{} = state, prefix) do
-    if State.peek_prefix?(state, prefix) do
+  defp ensure_prefix!(%State{} = state, pos, prefix) do
+    if State.peek_prefix?(state, pos, prefix) do
       :ok
     else
       Error.raise("Unexpected string delimiter")
     end
   end
 
-  defp take_basic_segment(%State{input: input, index: index} = state) do
-    rest = :binary.part(input, index, byte_size(input) - index)
-    take_segment(state, basic_segment_length(rest, 0))
+  defp take_basic_segment(%State{input: input}, pos) do
+    rest = :binary.part(input, pos, byte_size(input) - pos)
+    take_segment(input, pos, basic_segment_length(rest, 0))
   end
 
   defp basic_segment_length(<<char, _::binary>>, length)
@@ -346,9 +265,9 @@ defmodule TomlElixir.Parser.Strings do
   defp basic_segment_length(<<_, rest::binary>>, length), do: basic_segment_length(rest, length + 1)
   defp basic_segment_length("", length), do: length
 
-  defp take_literal_segment(%State{input: input, index: index} = state) do
-    rest = :binary.part(input, index, byte_size(input) - index)
-    take_segment(state, literal_segment_length(rest, 0))
+  defp take_literal_segment(%State{input: input}, pos) do
+    rest = :binary.part(input, pos, byte_size(input) - pos)
+    take_segment(input, pos, literal_segment_length(rest, 0))
   end
 
   defp literal_segment_length(<<char, _::binary>>, length) when char <= 0x08 or char in 0x0A..0x1F or char in [?', 0x7F],
@@ -357,42 +276,18 @@ defmodule TomlElixir.Parser.Strings do
   defp literal_segment_length(<<_, rest::binary>>, length), do: literal_segment_length(rest, length + 1)
   defp literal_segment_length("", length), do: length
 
-  defp take_segment(_state, 0), do: nil
-
-  defp take_segment(%State{input: input, index: index} = state, length) do
-    {:binary.part(input, index, length), %{state | index: index + length}}
-  end
-
-  def control_char?(codepoint) do
-    (codepoint >= 0x00 and codepoint <= 0x08) or
-      codepoint == 0x0B or
-      codepoint == 0x0C or
-      (codepoint >= 0x0E and codepoint <= 0x1F) or
-      codepoint == 0x7F
-  end
-
-  defp hex?(codepoint) do
-    (codepoint >= ?0 and codepoint <= ?9) or
-      (codepoint >= ?A and codepoint <= ?F) or
-      (codepoint >= ?a and codepoint <= ?f)
-  end
+  defp take_segment(_input, _pos, 0), do: nil
+  defp take_segment(input, pos, length), do: :binary.part(input, pos, length)
 
   defp invalid_codepoint?(codepoint) do
     codepoint > 0x10FFFF or (codepoint >= 0xD800 and codepoint <= 0xDFFF)
   end
 
-  defp quote_run_length(%State{} = state, quote_char) do
-    count_quote_run(state, quote_char, 0)
-  end
-
-  defp count_quote_run(%State{} = state, quote_char, count) do
-    case State.peek_codepoint(state) do
-      ^quote_char ->
-        state = State.consume_prefix(state, <<quote_char::utf8>>)
-        count_quote_run(state, quote_char, count + 1)
-
-      _ ->
-        count
+  defp count_quote_run(%State{} = state, pos, quote_char, count) do
+    if State.peek_byte(state, pos) == quote_char do
+      count_quote_run(state, pos + 1, quote_char, count + 1)
+    else
+      count
     end
   end
 end

@@ -21,7 +21,8 @@ defmodule TomlElixir.Parser.Table do
 
   @spec to_map(t) :: map
   def to_map(%__MODULE__{data: data}) do
-    Map.new(data, fn {key, value} -> {key, normalize_value(value)} end)
+    # Keys are unchanged, so mapping values in place avoids rebuilding each map from a list.
+    :maps.map(fn _key, value -> normalize_value(value) end, data)
   end
 
   defp normalize_value(%__MODULE__{} = table), do: to_map(table)

@@ -8,38 +8,28 @@ defmodule TomlElixir.Parser.Document do
   alias TomlElixir.Parser.Table
   alias TomlElixir.Parser.Value
 
-  @comment_end ~r/[\x00-\x08\x0A-\x1F\x7F]/
-
   @spec decode(binary, atom) :: map
   def decode(input, spec \\ :"1.1.0") do
     state = State.new(input, spec)
-    builder = Builder.new()
-    {state, builder} = parse_document(state, builder)
-    state = skip_blank(state)
 
-    if !State.eof?(state) do
-      Error.raise("Unexpected trailing content")
-    end
-
-    Builder.to_map(builder)
+    state
+    |> parse_document(0, Builder.new())
+    |> Builder.to_map()
   end
 
-  defp parse_document(%State{} = state, %Builder{} = builder) do
-    state = skip_blank(state)
+  defp parse_document(%State{} = state, pos, %Builder{} = builder) do
+    pos = skip_blank(state, pos)
 
-    if State.eof?(state) do
-      {state, builder}
+    if State.eof?(state, pos) do
+      builder
     else
-      {state, builder} = parse_statement(state, builder)
-      parse_document(state, builder)
+      parse_statement(state, pos, builder)
     end
   end
 
-  defp parse_statement(%State{} = state, %Builder{} = builder) do
-    state = skip_spaces(state)
-
-    if State.peek_prefix?(state, "[") do
-      {state, type, path} = parse_table_header(state)
+  defp parse_statement(%State{} = state, pos, %Builder{} = builder) do
+    if State.peek_byte(state, pos) == ?[ do
+      {pos, type, path} = parse_table_header(state, pos)
 
       builder =
         case type do
@@ -47,373 +37,319 @@ defmodule TomlElixir.Parser.Document do
           :array_table -> Builder.define_array_table(builder, path)
         end
 
-      state = consume_line_end(state)
-      {state, builder}
+      parse_document(state, consume_line_end(state, pos), builder)
     else
-      {state, key} = parse_key(state)
-      state = skip_spaces(state)
-      state = expect_char(state, ?=)
-      state = skip_spaces(state)
-      {state, value} = parse_value(state, false)
+      {pos, key} = parse_key(state, pos)
+      pos = skip_spaces(state, pos)
+      pos = expect_char(state, pos, ?=)
+      pos = skip_spaces(state, pos)
+      {pos, value} = parse_value(state, pos)
       builder = Builder.put_value(builder, key, value)
-      state = consume_line_end(state)
-      {state, builder}
+      parse_document(state, consume_line_end(state, pos), builder)
     end
   end
 
-  defp parse_table_header(%State{} = state) do
-    cond_result =
-      cond do
-        State.peek_prefix?(state, "[[") ->
-          state = State.consume_prefix(state, "[[")
-          state = skip_spaces(state)
-          {state, path} = parse_key(state)
-          state = skip_spaces(state)
-          state = expect_prefix(state, "]]")
-          {:array_table, path, state}
+  defp parse_table_header(%State{} = state, pos) do
+    cond do
+      State.peek_prefix?(state, pos, "[[") ->
+        pos = skip_spaces(state, pos + 2)
+        {pos, path} = parse_key(state, pos)
+        pos = skip_spaces(state, pos)
+        pos = expect_prefix(state, pos, "]]")
+        {pos, :array_table, path}
 
-        State.peek_prefix?(state, "[") ->
-          state = State.consume_prefix(state, "[")
-          state = skip_spaces(state)
-          {state, path} = parse_key(state)
-          state = skip_spaces(state)
-          state = expect_prefix(state, "]")
-          {:table, path, state}
+      State.peek_prefix?(state, pos, "[") ->
+        pos = skip_spaces(state, pos + 1)
+        {pos, path} = parse_key(state, pos)
+        pos = skip_spaces(state, pos)
+        pos = expect_prefix(state, pos, "]")
+        {pos, :table, path}
 
-        true ->
-          Error.raise("Invalid table header")
-      end
-
-    normalize_table_header_return(cond_result)
+      true ->
+        Error.raise("Invalid table header")
+    end
   end
 
-  defp normalize_table_header_return({:array_table, path, state}), do: {state, :array_table, path}
-  defp normalize_table_header_return({:table, path, state}), do: {state, :table, path}
-
-  defp parse_key(%State{} = state) do
-    {state, first} = parse_key_part(state)
-    {state, parts} = parse_key_tail(state, [first])
-    {state, Enum.reverse(parts)}
+  defp parse_key(%State{} = state, pos) do
+    {pos, first} = parse_key_part(state, pos)
+    parse_key_tail(state, pos, [first])
   end
 
-  defp parse_key_tail(%State{} = state, parts) do
-    state = skip_spaces(state)
+  defp parse_key_tail(%State{} = state, pos, parts) do
+    pos = skip_spaces(state, pos)
 
-    case State.peek_codepoint(state) do
+    case State.peek_byte(state, pos) do
       ?. ->
-        state = State.consume_prefix(state, ".")
-        state = skip_spaces(state)
-        {state, part} = parse_key_part(state)
-        parse_key_tail(state, [part | parts])
+        pos = skip_spaces(state, pos + 1)
+        {pos, part} = parse_key_part(state, pos)
+        parse_key_tail(state, pos, [part | parts])
+
+      _ when tl(parts) == [] ->
+        # Most keys have one part, which needs no reversed copy.
+        {pos, parts}
 
       _ ->
-        {state, parts}
+        {pos, Enum.reverse(parts)}
     end
   end
 
-  defp parse_key_part(%State{} = state) do
-    state = skip_spaces(state)
+  defp parse_key_part(%State{} = state, pos) do
+    pos = skip_spaces(state, pos)
 
-    case State.peek_byte(state) do
+    case State.peek_byte(state, pos) do
       ?" ->
-        if State.peek_prefix?(state, "\"\"\"") do
+        if State.peek_prefix?(state, pos, "\"\"\"") do
           Error.raise("Multiline strings are not allowed in keys")
         end
 
-        {value, state} = Strings.parse_basic(state, false)
-        {state, value}
+        {value, pos} = Strings.parse_basic(state, pos, false)
+        {pos, value}
 
       ?' ->
-        if State.peek_prefix?(state, "'''") do
+        if State.peek_prefix?(state, pos, "'''") do
           Error.raise("Multiline strings are not allowed in keys")
         end
 
-        {value, state} = Strings.parse_literal(state, false)
-        {state, value}
+        {value, pos} = Strings.parse_literal(state, pos, false)
+        {pos, value}
 
       _ ->
-        {token, state} = take_bare_key(state)
+        {token, pos} = take_bare_key(state, pos)
 
         if token == "" do
           Error.raise("Invalid key")
         end
 
-        {state, token}
+        {pos, token}
     end
   end
 
-  defp parse_value(%State{} = state, inline?) do
-    case State.peek_byte(state) do
+  defp parse_value(%State{} = state, pos) do
+    case State.peek_byte(state, pos) do
       ?" ->
-        {value, state} = Strings.parse_basic(state, State.peek_prefix?(state, "\"\"\""))
-        {state, value}
+        {value, pos} = Strings.parse_basic(state, pos, State.peek_prefix?(state, pos, "\"\"\""))
+        {pos, value}
 
       ?' ->
-        {value, state} = Strings.parse_literal(state, State.peek_prefix?(state, "'''"))
-        {state, value}
+        {value, pos} = Strings.parse_literal(state, pos, State.peek_prefix?(state, pos, "'''"))
+        {pos, value}
 
       ?[ ->
-        {state, value} = parse_array(state, inline?)
-        {state, value}
+        parse_array(state, pos)
 
       ?{ ->
-        {state, value} = parse_inline_table(state)
-        {state, value}
+        parse_inline_table(state, pos)
 
       _ ->
-        {token, state} = take_value_token(state)
+        parse_scalar(state, pos)
+    end
+  end
 
-        {token, state} =
-          if match?(<<_::binary-size(4), ?-, _::binary-size(2), ?-, _::binary-size(2)>>, token) and
-               State.peek_codepoint(state) == ?\s do
-            state_after_space = State.consume_prefix(state, " ")
+  defp parse_scalar(%State{} = state, pos) do
+    {token, pos} = take_value_token(state, pos)
 
-            case State.peek_codepoint(state_after_space) do
-              digit when digit in ?0..?9 ->
-                {time_part, state_after_time} = take_value_token(state_after_space)
+    {token, pos} =
+      if match?(<<_::binary-size(4), ?-, _::binary-size(2), ?-, _::binary-size(2)>>, token) and
+           State.peek_byte(state, pos) == ?\s do
+        # A space may separate the date and time of a datetime.
+        case State.peek_byte(state, pos + 1) do
+          digit when digit in ?0..?9 ->
+            {time_part, time_end} = take_value_token(state, pos + 1)
 
-                if match?(<<_::binary-size(2), ?:, _::binary-size(2), _::binary>>, time_part) do
-                  {token <> " " <> time_part, state_after_time}
-                else
-                  {token, state}
-                end
-
-              _ ->
-                {token, state}
+            if match?(<<_::binary-size(2), ?:, _::binary-size(2), _::binary>>, time_part) do
+              {token <> " " <> time_part, time_end}
+            else
+              {token, pos}
             end
-          else
-            {token, state}
-          end
 
-        if token == "" do
-          Error.raise("Invalid value")
+          _ ->
+            {token, pos}
         end
+      else
+        {token, pos}
+      end
 
-        {state, Value.parse_scalar(token, state.spec)}
+    if token == "" do
+      Error.raise("Invalid value")
     end
+
+    {pos, Value.parse_scalar(token, state.spec)}
   end
 
-  defp parse_array(%State{} = state, inline?) do
-    state = expect_prefix(state, "[")
-    state = skip_array_ws(state, inline?)
+  defp parse_array(%State{} = state, pos) do
+    pos = expect_prefix(state, pos, "[")
+    pos = skip_array_ws(state, pos)
 
-    if State.peek_prefix?(state, "]") do
-      {State.consume_prefix(state, "]"), []}
+    if State.peek_byte(state, pos) == ?] do
+      {pos + 1, []}
     else
-      {state, values} = parse_array_values(state, inline?, [])
-      state = skip_array_ws(state, inline?)
-      state = expect_prefix(state, "]")
-      {state, Enum.reverse(values)}
+      {pos, values} = parse_array_values(state, pos, [])
+      pos = skip_array_ws(state, pos)
+      pos = expect_prefix(state, pos, "]")
+      {pos, Enum.reverse(values)}
     end
   end
 
-  defp parse_array_values(%State{} = state, inline?, acc) do
-    {state, value} = parse_value(state, inline?)
-    state = skip_array_ws(state, inline?)
+  defp parse_array_values(%State{} = state, pos, acc) do
+    {pos, value} = parse_value(state, pos)
+    pos = skip_array_ws(state, pos)
 
-    case State.peek_codepoint(state) do
+    case State.peek_byte(state, pos) do
       ?, ->
-        state = State.consume_prefix(state, ",")
-        state = skip_array_ws(state, inline?)
+        pos = skip_array_ws(state, pos + 1)
 
-        if State.peek_prefix?(state, "]") do
-          {state, [value | acc]}
+        if State.peek_byte(state, pos) == ?] do
+          {pos, [value | acc]}
         else
-          parse_array_values(state, inline?, [value | acc])
+          parse_array_values(state, pos, [value | acc])
         end
 
       _ ->
-        {state, [value | acc]}
+        {pos, [value | acc]}
     end
   end
 
-  defp parse_inline_table(%State{} = state) do
-    state = expect_prefix(state, "{")
-    state = skip_inline_ws(state)
+  defp parse_inline_table(%State{} = state, pos) do
+    pos = expect_prefix(state, pos, "{")
+    pos = skip_inline_ws(state, pos)
 
-    if State.peek_prefix?(state, "}") do
-      {State.consume_prefix(state, "}"), Builder.inline_table()}
+    if State.peek_byte(state, pos) == ?} do
+      {pos + 1, Builder.inline_table()}
     else
-      {state, table} = parse_inline_table_pairs(state, Builder.inline_table())
-      state = skip_inline_ws(state)
-      state = expect_prefix(state, "}")
-      {state, Table.freeze(table)}
+      {pos, table} = parse_inline_table_pairs(state, pos, Builder.inline_table())
+      pos = skip_inline_ws(state, pos)
+      pos = expect_prefix(state, pos, "}")
+      {pos, Table.freeze(table)}
     end
   end
 
-  defp parse_inline_table_pairs(%State{} = state, table) do
-    {state, key} = parse_key(state)
-    state = skip_inline_ws(state)
-    state = expect_char(state, ?=)
-    state = skip_inline_ws(state)
-    {state, value} = parse_value(state, true)
+  defp parse_inline_table_pairs(%State{} = state, pos, table) do
+    {pos, key} = parse_key(state, pos)
+    pos = skip_inline_ws(state, pos)
+    pos = expect_char(state, pos, ?=)
+    pos = skip_inline_ws(state, pos)
+    {pos, value} = parse_value(state, pos)
     table = Builder.put_inline_value(table, key, value)
-    state = skip_inline_ws(state)
+    pos = skip_inline_ws(state, pos)
 
-    case State.peek_codepoint(state) do
+    case State.peek_byte(state, pos) do
       ?, ->
-        state = State.consume_prefix(state, ",")
-        state = skip_inline_ws(state)
+        pos = skip_inline_ws(state, pos + 1)
 
-        if State.peek_prefix?(state, "}") do
+        if State.peek_byte(state, pos) == ?} do
           if state.spec == :"1.1.0" do
-            {state, table}
+            {pos, table}
           else
             Error.raise("Trailing comma in inline table")
           end
         else
-          parse_inline_table_pairs(state, table)
+          parse_inline_table_pairs(state, pos, table)
         end
 
       _ ->
-        {state, table}
+        {pos, table}
     end
   end
 
-  defp skip_blank(%State{} = state) do
-    state = skip_spaces(state)
+  defp skip_blank(%State{} = state, pos) do
+    pos = skip_spaces(state, pos)
 
-    case State.peek_codepoint(state) do
-      ?# ->
-        state = skip_comment(state)
-        skip_blank(state)
-
-      ?\n ->
-        skip_blank(State.consume_prefix(state, "\n"))
-
-      ?\r ->
-        state = consume_newline(state)
-        skip_blank(state)
-
-      _ ->
-        state
+    case State.peek_byte(state, pos) do
+      ?# -> skip_blank(state, skip_comment(state, pos))
+      ?\n -> skip_blank(state, pos + 1)
+      ?\r -> skip_blank(state, crlf_end(state, pos))
+      _ -> pos
     end
   end
 
-  defp skip_spaces(%State{input: input, index: index} = state) do
-    if index < byte_size(input) and :binary.at(input, index) in [?\s, ?\t] do
-      %{state | index: skip_space_index(input, index + 1)}
+  defp skip_spaces(%State{input: input}, pos), do: skip_space_index(input, pos)
+
+  defp skip_space_index(input, pos) when pos < byte_size(input) do
+    if :binary.at(input, pos) in [?\s, ?\t], do: skip_space_index(input, pos + 1), else: pos
+  end
+
+  defp skip_space_index(_input, pos), do: pos
+
+  defp skip_array_ws(%State{} = state, pos) do
+    pos = skip_spaces(state, pos)
+
+    case State.peek_byte(state, pos) do
+      ?\n -> skip_array_ws(state, pos + 1)
+      ?\r -> skip_array_ws(state, crlf_end(state, pos))
+      ?# -> skip_array_ws(state, skip_comment(state, pos))
+      _ -> pos
+    end
+  end
+
+  defp skip_inline_ws(%State{} = state, pos) do
+    pos = skip_spaces(state, pos)
+
+    case State.peek_byte(state, pos) do
+      ?# when state.spec == :"1.1.0" -> skip_inline_ws(state, skip_comment(state, pos))
+      ?\n when state.spec == :"1.1.0" -> skip_inline_ws(state, pos + 1)
+      ?\r when state.spec == :"1.1.0" -> skip_inline_ws(state, crlf_end(state, pos))
+      _ -> pos
+    end
+  end
+
+  defp skip_comment(%State{input: input} = state, pos) do
+    pos = expect_char(state, pos, ?#)
+    <<_::binary-size(^pos), rest::binary>> = input
+    pos = comment_end(rest, pos)
+
+    if State.peek_byte(state, pos) in [nil, ?\n, ?\r] do
+      pos
     else
-      state
+      Error.raise("Control character in comment")
     end
   end
 
-  defp skip_space_index(input, index) when index < byte_size(input) do
-    if :binary.at(input, index) in [?\s, ?\t], do: skip_space_index(input, index + 1), else: index
-  end
+  # Input is already valid UTF-8, so only ASCII control bytes can end a comment; a byte
+  # loop avoids running a regex over the remaining document for every comment.
+  defp comment_end(<<char, rest::binary>>, pos) when char == ?\t or char in 0x20..0x7E or char >= 0x80,
+    do: comment_end(rest, pos + 1)
 
-  defp skip_space_index(_input, index), do: index
+  defp comment_end(_rest, pos), do: pos
 
-  defp skip_array_ws(%State{} = state, inline?) do
-    case State.peek_codepoint(state) do
-      ?\s ->
-        skip_array_ws(State.consume_prefix(state, " "), inline?)
+  defp consume_line_end(%State{} = state, pos) do
+    pos = skip_spaces(state, pos)
 
-      ?\t ->
-        skip_array_ws(State.consume_prefix(state, "\t"), inline?)
-
-      ?\n ->
-        skip_array_ws(State.consume_prefix(state, "\n"), inline?)
-
-      ?\r ->
-        state = consume_newline(state)
-        skip_array_ws(state, inline?)
-
-      ?# ->
-        state = skip_comment(state)
-        skip_array_ws(state, inline?)
-
-      _ ->
-        state
-    end
-  end
-
-  defp skip_inline_ws(%State{} = state) do
-    state = skip_spaces(state)
-
-    case State.peek_codepoint(state) do
-      ?# ->
-        if state.spec == :"1.1.0" do
-          state = skip_comment(state)
-          skip_inline_ws(state)
-        else
-          state
-        end
-
-      ?\n ->
-        if state.spec == :"1.1.0" do
-          skip_inline_ws(State.consume_prefix(state, "\n"))
-        else
-          state
-        end
-
-      ?\r ->
-        if state.spec == :"1.1.0" do
-          state = consume_newline(state)
-          skip_inline_ws(state)
-        else
-          state
-        end
-
-      _ ->
-        state
-    end
-  end
-
-  defp skip_comment(%State{input: input} = state) do
-    state = expect_char(state, ?#)
-
-    case Regex.run(@comment_end, input, return: :index, offset: state.index) do
-      nil ->
-        %{state | index: byte_size(input)}
-
-      [{index, 1}] ->
-        if :binary.at(input, index) in [?\n, ?\r] do
-          %{state | index: index}
-        else
-          Error.raise("Control character in comment")
-        end
-    end
-  end
-
-  defp consume_line_end(%State{} = state) do
-    state = skip_spaces(state)
-
-    state =
-      if State.peek_codepoint(state) == ?# do
-        skip_comment(state)
+    pos =
+      if State.peek_byte(state, pos) == ?# do
+        skip_comment(state, pos)
       else
-        state
+        pos
       end
 
-    case State.peek_codepoint(state) do
-      nil -> state
-      ?\n -> State.consume_prefix(state, "\n")
-      ?\r -> consume_newline(state)
+    case State.peek_byte(state, pos) do
+      nil -> pos
+      ?\n -> pos + 1
+      ?\r -> crlf_end(state, pos)
       _ -> Error.raise("Unexpected characters after statement")
     end
   end
 
-  defp expect_char(%State{} = state, char) do
-    case State.peek_codepoint(state) do
-      ^char -> State.consume_prefix(state, <<char::utf8>>)
-      _ -> Error.raise("Expected #{<<char::utf8>>}")
+  defp expect_char(%State{} = state, pos, char) do
+    if State.peek_byte(state, pos) == char do
+      pos + 1
+    else
+      Error.raise("Expected #{<<char::utf8>>}")
     end
   end
 
-  defp expect_prefix(%State{} = state, prefix) do
-    if State.peek_prefix?(state, prefix) do
-      State.consume_prefix(state, prefix)
+  defp expect_prefix(%State{} = state, pos, prefix) do
+    if State.peek_prefix?(state, pos, prefix) do
+      pos + byte_size(prefix)
     else
       Error.raise("Expected #{prefix}")
     end
   end
 
-  defp take_bare_key(%State{input: input, index: index} = state) do
-    rest = :binary.part(input, index, byte_size(input) - index)
+  defp take_bare_key(%State{input: input}, pos) do
+    rest = :binary.part(input, pos, byte_size(input) - pos)
     length = bare_key_length(rest, 0)
-    token = input |> :binary.part(index, length) |> :binary.copy()
-    {token, %{state | index: index + length}}
+    token = input |> :binary.part(pos, length) |> :binary.copy()
+    {token, pos + length}
   end
 
   defp bare_key_length(<<char, rest::binary>>, length)
@@ -423,20 +359,19 @@ defmodule TomlElixir.Parser.Document do
 
   defp bare_key_length(_, length), do: length
 
-  defp take_value_token(%State{input: input, index: index} = state) do
-    rest = :binary.part(input, index, byte_size(input) - index)
+  defp take_value_token(%State{input: input}, pos) do
+    rest = :binary.part(input, pos, byte_size(input) - pos)
     length = value_token_length(rest, 0)
-    token = :binary.part(input, index, length)
-    {token, %{state | index: index + length}}
+    {:binary.part(input, pos, length), pos + length}
   end
 
   defp value_token_length(<<char, _::binary>>, length) when char in [?\s, ?\t, ?\n, ?\r, ?,, ?], ?}, ?#], do: length
   defp value_token_length(<<_, rest::binary>>, length), do: value_token_length(rest, length + 1)
   defp value_token_length("", length), do: length
 
-  defp consume_newline(%State{} = state) do
-    if State.peek_prefix?(state, "\r\n") do
-      State.consume_prefix(state, "\r\n")
+  defp crlf_end(%State{} = state, pos) do
+    if State.peek_prefix?(state, pos, "\r\n") do
+      pos + 2
     else
       Error.raise("Bare carriage return")
     end

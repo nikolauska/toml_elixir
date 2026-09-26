@@ -1,78 +1,43 @@
 defmodule TomlElixir.Parser.State do
   @moduledoc false
 
-  defstruct input: "", index: 0, spec: :"1.1.0"
+  # The parser threads the byte position as a separate integer instead of storing it
+  # here: rebuilding a struct for every consumed token was a large share of decode
+  # allocations, and garbage collection dominates decode time on large documents.
+  defstruct input: "", spec: :"1.1.0"
 
-  @type t :: %__MODULE__{input: binary, index: non_neg_integer, spec: atom}
+  @type t :: %__MODULE__{input: binary, spec: atom}
+  @type pos :: non_neg_integer
 
   @spec new(binary, atom) :: t
   def new(input, spec \\ :"1.1.0") when is_binary(input) do
-    %__MODULE__{input: input, index: 0, spec: spec}
+    %__MODULE__{input: input, spec: spec}
   end
 
-  @spec eof?(t) :: boolean
-  def eof?(%__MODULE__{input: input, index: index}) do
-    index >= byte_size(input)
+  @spec eof?(t, pos) :: boolean
+  def eof?(%__MODULE__{input: input}, pos) do
+    pos >= byte_size(input)
   end
 
-  @spec peek_byte(t) :: integer | nil
-  def peek_byte(%__MODULE__{input: input, index: index}) do
-    if index >= byte_size(input) do
+  @spec peek_byte(t, pos) :: integer | nil
+  def peek_byte(%__MODULE__{input: input}, pos) do
+    if pos >= byte_size(input) do
       nil
     else
-      :binary.at(input, index)
+      :binary.at(input, pos)
     end
   end
 
-  @spec peek_prefix?(t, binary) :: boolean
-  def peek_prefix?(%__MODULE__{} = state, prefix) do
-    prefix_size = byte_size(prefix)
-    remaining = byte_size(state.input) - state.index
-
-    if remaining < prefix_size do
-      false
-    else
-      :binary.part(state.input, state.index, prefix_size) == prefix
-    end
+  @spec peek_prefix?(t, pos, binary) :: boolean
+  def peek_prefix?(%__MODULE__{input: input}, pos, prefix) do
+    byte_size(input) - pos >= byte_size(prefix) and prefix_at?(input, pos, prefix, 0)
   end
 
-  @spec consume_prefix(t, binary) :: t
-  def consume_prefix(%__MODULE__{} = state, prefix) do
-    %{state | index: state.index + byte_size(prefix)}
-  end
+  # Compares byte by byte because slicing the input for `==` allocates a sub-binary on
+  # every delimiter check.
+  defp prefix_at?(_input, _pos, prefix, offset) when offset == byte_size(prefix), do: true
 
-  @spec next_codepoint(t) :: {integer | nil, t}
-  def next_codepoint(%__MODULE__{index: index, input: input} = state) do
-    if index >= byte_size(input) do
-      {nil, state}
-    else
-      case :binary.at(input, index) do
-        byte when byte < 0x80 ->
-          {byte, %{state | index: index + 1}}
-
-        _ ->
-          <<_::binary-size(^index), rest::binary>> = input
-          <<codepoint::utf8, tail::binary>> = rest
-          size = byte_size(rest) - byte_size(tail)
-          {codepoint, %{state | index: index + size}}
-      end
-    end
-  end
-
-  @spec peek_codepoint(t) :: integer | nil
-  def peek_codepoint(%__MODULE__{index: index, input: input}) do
-    if index >= byte_size(input) do
-      nil
-    else
-      case :binary.at(input, index) do
-        byte when byte < 0x80 ->
-          byte
-
-        _ ->
-          <<_::binary-size(^index), rest::binary>> = input
-          <<codepoint::utf8, _::binary>> = rest
-          codepoint
-      end
-    end
+  defp prefix_at?(input, pos, prefix, offset) do
+    :binary.at(input, pos + offset) == :binary.at(prefix, offset) and prefix_at?(input, pos, prefix, offset + 1)
   end
 end
