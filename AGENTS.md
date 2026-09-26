@@ -1,6 +1,6 @@
 # Working in toml_elixir
 
-This is a Mix library for parsing and encoding TOML 1.0.0 and 1.1.0. Work from the repository root. Use `mise x -- mix ...` for Mix commands; `mise.toml` pins Elixir 1.20.2 and Erlang 29.0.2. The library supports Elixir `>= 1.18.0`.
+This is a Mix library for parsing and encoding TOML 1.0.0 and 1.1.0. Work from the repository root. Use `mise x -- mix ...` for Mix commands; `mise.toml` pins the Elixir and Erlang versions. The library supports Elixir `>= 1.18.0`.
 
 ## Where changes belong
 
