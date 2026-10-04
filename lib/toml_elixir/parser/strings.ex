@@ -134,7 +134,11 @@ defmodule TomlElixir.Parser.Strings do
         {"\n", pos + 1}
 
       ?e ->
-        {<<0x1B>>, pos + 1}
+        if state.spec == :"1.1.0" do
+          {<<0x1B>>, pos + 1}
+        else
+          Error.raise("Invalid escape sequence")
+        end
 
       ?f ->
         {<<0x0C>>, pos + 1}

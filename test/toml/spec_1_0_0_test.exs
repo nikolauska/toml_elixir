@@ -50,4 +50,21 @@ defmodule TomlElixir.Spec100Test do
         raise "Unexpected TOML fixture path: #{rel_path}"
     end
   end
+
+  test "rejects the TOML 1.1.0 escape in basic strings and quoted keys" do
+    for toml <- [~S(value = "\e"), ~S(value = """\e"""), ~S("\e" = 1)] do
+      assert {:error, %TomlElixir.Parser.Error{}} = TomlElixir.decode(toml, spec: :"1.0.0")
+    end
+  end
+
+  test "preserves Unicode ESC escapes and literal backslash-e" do
+    toml = ~S"""
+    unicode = "\u001B"
+    literal = '\e'
+    escaped = "\\e"
+    """
+
+    assert {:ok, %{"unicode" => <<0x1B>>, "literal" => "\\e", "escaped" => "\\e"}} =
+             TomlElixir.decode(toml, spec: :"1.0.0")
+  end
 end
