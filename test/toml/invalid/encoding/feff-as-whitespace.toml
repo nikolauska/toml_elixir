@@ -1,0 +1,2 @@
+# U+FEFF cannot separate a value from a trailing comment.
+a = 1 ﻿# comment

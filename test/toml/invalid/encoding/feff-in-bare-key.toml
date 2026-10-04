@@ -1,0 +1,2 @@
+# U+FEFF is allowed only in quoted keys.
+a﻿b = 1

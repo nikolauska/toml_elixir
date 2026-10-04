@@ -24,20 +24,8 @@ defmodule TomlElixir.Parser do
         _ -> Error.raise("Invalid UTF-8")
       end
 
-    {str, had_bom?} =
-      case str do
-        <<0xEF, 0xBB, 0xBF, rest::binary>> -> {rest, true}
-        _ -> {str, false}
-      end
-
-    if had_bom? and String.contains?(str, <<0xEF, 0xBB, 0xBF>>) do
-      Error.raise("BOM must appear only at start of document")
-    end
-
-    if not had_bom? and String.contains?(str, <<0xEF, 0xBB, 0xBF>>) do
-      Error.raise("BOM must appear only at start of document")
-    end
-
-    str
+    # Only the document prefix is an encoding signature; other U+FEFF characters
+    # are content whose validity depends on the surrounding TOML syntax.
+    String.replace_prefix(str, <<0xEF, 0xBB, 0xBF>>, "")
   end
 end

@@ -1,0 +1,16 @@
+# U+FEFF is string and comment content, not whitespace: ﻿
+basic = "﻿left﻿right﻿"
+literal = '﻿left﻿right﻿'
+ml-basic = """
+left﻿
+right﻿
+"""
+ml-literal = '''
+left﻿
+right﻿
+'''
+unicode-short = "\uFEFF"
+unicode-long = "\U0000FEFF"
+"basic﻿key" = 1
+'literal﻿key' = 2
+"﻿" = "﻿" # Trailing comment containing U+FEFF: ﻿

@@ -1,0 +1,11 @@
+{
+    "basic": {"type": "string", "value": "\uFEFFleft\uFEFFright\uFEFF"},
+    "literal": {"type": "string", "value": "\uFEFFleft\uFEFFright\uFEFF"},
+    "ml-basic": {"type": "string", "value": "left\uFEFF\nright\uFEFF\n"},
+    "ml-literal": {"type": "string", "value": "left\uFEFF\nright\uFEFF\n"},
+    "unicode-short": {"type": "string", "value": "\uFEFF"},
+    "unicode-long": {"type": "string", "value": "\uFEFF"},
+    "basic\uFEFFkey": {"type": "integer", "value": "1"},
+    "literal\uFEFFkey": {"type": "integer", "value": "2"},
+    "\uFEFF": {"type": "string", "value": "\uFEFF"}
+}

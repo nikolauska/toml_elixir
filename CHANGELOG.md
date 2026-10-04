@@ -1,3 +1,10 @@
+## Unreleased
+
+### Fixes
+
+* **ESC escape versioning**: Reject `\e` in basic strings and quoted keys under TOML 1.0.0 while retaining TOML 1.1.0 support. The `\u001B` escape remains valid in both versions.
+* **Literal U+FEFF**: Accept literal U+FEFF in strings, quoted keys, and comments in both TOML versions, preserving string and key content and restoring value and key encode/decode round trips. Encoder output is unchanged. Strip only one document-leading BOM; invalid U+FEFF placements remain rejected.
+
 ## 3.2.0 (2026-09-26)
 
 ### Fixes

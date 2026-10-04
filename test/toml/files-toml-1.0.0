@@ -126,6 +126,8 @@ invalid/encoding/bad-utf8-in-string-literal.toml
 invalid/encoding/bom-not-at-start-01.toml
 invalid/encoding/bom-not-at-start-02.toml
 invalid/encoding/bom-not-at-start-03.toml
+invalid/encoding/feff-as-whitespace.toml
+invalid/encoding/feff-in-bare-key.toml
 invalid/encoding/ideographic-space.toml
 invalid/encoding/utf16-bom.toml
 invalid/encoding/utf16-comment.toml
@@ -831,6 +833,8 @@ valid/string/escaped-escape.json
 valid/string/escaped-escape.toml
 valid/string/escapes.json
 valid/string/escapes.toml
+valid/string/feff.json
+valid/string/feff.toml
 valid/string/multibyte.json
 valid/string/multibyte.toml
 valid/string/multibyte-escape.json
@@ -915,3 +919,5 @@ valid/utf8-bom-01.json
 valid/utf8-bom-01.toml
 valid/utf8-bom-02.json
 valid/utf8-bom-02.toml
+valid/utf8-bom-03.json
+valid/utf8-bom-03.toml
