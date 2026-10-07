@@ -2,7 +2,7 @@ defmodule TomlElixir.Mixfile do
   use Mix.Project
 
   def project do
-    version = "3.2.0"
+    version = "3.2.1"
 
     [
       app: :toml_elixir,
