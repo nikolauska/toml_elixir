@@ -1,0 +1,25 @@
+name: Dependabot auto-merge
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    # Only act on Dependabot's own PRs in this repo, never on forks or human PRs.
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == 'nikolauska/toml_elixir'
+    runs-on: ubuntu-latest
+    steps:
+      - id: meta
+        uses: dependabot/fetch-metadata@v3
+      # Dev and test tooling never ships to Hex users, so a green CI is enough.
+      # Runtime dependencies, majors, and actions wait for a human review.
+      - if: >-
+          steps.meta.outputs.dependency-type == 'direct:development' &&
+          steps.meta.outputs.update-type != 'version-update:semver-major'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
