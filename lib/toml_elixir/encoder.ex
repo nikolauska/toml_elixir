@@ -140,16 +140,9 @@ defmodule TomlElixir.Encoder.Helpers do
   def encode_value(value) when is_map(value) and not is_struct(value), do: encode_inline_table(value)
   def encode_value(value), do: TomlElixir.Encoder.encode(value)
 
-  def encode_float(float) do
-    # TOML requires a fractional part or exponent
-    str = Float.to_string(float)
-
-    if String.contains?(str, ".") or String.contains?(str, "e") do
-      str
-    else
-      str <> ".0"
-    end
-  end
+  # TOML requires a fractional part or exponent. The shortest round-trip format always has
+  # one (`1.0`, `1.0e20`), so the output needs no scan for `.` or `e`.
+  def encode_float(float), do: :erlang.float_to_binary(float, [:short])
 
   def encode_array(list), do: [?[, encode_items(list, list), ?]]
 

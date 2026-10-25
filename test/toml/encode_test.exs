@@ -70,6 +70,17 @@ defmodule TomlElixir.EncodeTest do
     end
   end
 
+  describe "floats" do
+    test "always include a fraction or exponent" do
+      data = %{a: 1.0, b: -0.0, c: 1.0e20, d: 1.0e-7, e: 0.1, f: 1.5e300}
+
+      assert TomlElixir.encode!(data) ==
+               "a = 1.0\nb = -0.0\nc = 1.0e20\nd = 1.0e-7\ne = 0.1\nf = 1.5e300\n"
+
+      assert TomlElixir.decode!(TomlElixir.encode!(data)) == Map.new(data, fn {k, v} -> {to_string(k), v} end)
+    end
+  end
+
   describe "formatting options" do
     test "writes one array element per line with multiline_arrays" do
       data = %{ports: [8000, 8001], empty: [], nested: [[1, 2]]}
