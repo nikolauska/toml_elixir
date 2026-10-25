@@ -7,7 +7,7 @@ defmodule TomlElixir.Encoder.Error do
       array elements. An empty list means the failure happened at the top level.
   """
 
-  alias TomlElixir.Encoder.Helpers
+  alias TomlElixir.KeyPath
 
   defexception reason: "Unknown error", path: []
 
@@ -16,10 +16,5 @@ defmodule TomlElixir.Encoder.Error do
   # The path leads because some underlying reasons, like protocol errors, span several lines.
   @spec message(t) :: String.t()
   def message(%__MODULE__{reason: reason, path: []}), do: reason
-  def message(%__MODULE__{reason: reason, path: path}), do: "#{format_path(path)}: #{reason}"
-
-  defp format_path([key | rest]), do: IO.iodata_to_binary([Helpers.encode_key(key) | Enum.map(rest, &format_segment/1)])
-
-  defp format_segment(index) when is_integer(index), do: "[#{index}]"
-  defp format_segment(key), do: [?. | Helpers.encode_key(key)]
+  def message(%__MODULE__{reason: reason, path: path}), do: "#{KeyPath.format(path)}: #{reason}"
 end

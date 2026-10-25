@@ -5,6 +5,7 @@ defmodule TomlElixir.Parser do
 
   alias TomlElixir.Parser.Document
   alias TomlElixir.Parser.Error
+  alias TomlElixir.Parser.Keys
 
   @type options :: map | keyword
 
@@ -12,6 +13,9 @@ defmodule TomlElixir.Parser do
 
   @spec decode(binary, options) :: {:ok, map} | {:error, Exception.t()}
   def decode(str, opts \\ []) when is_binary(str) do
+    # Invalid options are caller bugs, so they raise even for invalid documents.
+    keys = opts |> Keyword.get(:keys, :strings) |> Keys.converter!()
+
     # Only the document prefix is an encoding signature; other U+FEFF characters
     # are content whose validity depends on the surrounding TOML syntax.
     {input, prefix_size} =
@@ -23,7 +27,7 @@ defmodule TomlElixir.Parser do
     try do
       validate_utf8!(input)
       spec = Keyword.get(opts, :spec, :"1.1.0")
-      {:ok, Document.decode(input, spec)}
+      {:ok, input |> Document.decode(spec) |> Keys.convert(keys)}
     rescue
       exception in Error -> {:error, Error.locate(exception, input, prefix_size)}
     end

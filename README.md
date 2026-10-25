@@ -51,6 +51,19 @@ data = TomlElixir.decode!(toml_string)
 TomlElixir.decode(toml_string, spec: :"1.0.0")
 ```
 
+Keys are strings by default. Use `keys: :atoms!` to convert them to atoms that already
+exist; a key without one fails decoding, so documents cannot create new atoms. For tighter
+control, pass a function such as an explicit mapping:
+
+```elixir
+TomlElixir.decode("[server]\nport = 80", keys: :atoms!)
+#=> {:ok, %{server: %{port: 80}}}
+
+mapping = %{"server" => :server, "port" => :port}
+TomlElixir.decode("[server]\nport = 80", keys: &Map.fetch!(mapping, &1))
+#=> {:ok, %{server: %{port: 80}}}
+```
+
 ### Encoding to TOML
 
 Convert an Elixir Map back into a valid TOML string.

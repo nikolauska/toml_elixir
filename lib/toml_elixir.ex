@@ -36,6 +36,18 @@ defmodule TomlElixir do
 
   ## Options
     * `:spec` - The TOML specification version to follow. Can be `:"1.1.0"` (default) or `:"1.0.0"`.
+    * `:keys` - How table keys are returned. Conversion runs after TOML validation, including
+      duplicate-key checks, and applies to nested tables, inline tables, and arrays of tables.
+      * `:strings` (default) - keep keys as strings.
+      * `:atoms!` - convert keys to existing atoms with `String.to_existing_atom/1`. A key with
+        no existing atom fails decoding. New atoms are never created, because atoms are not
+        garbage-collected; existing atoms are still not an application-specific allowlist.
+      * a 1-arity function - called with each string key, returning the key to use. Raise to
+        reject a key; `decode/2` then returns an error. Pass an explicit mapping for the
+        tightest control, for example `&Map.fetch!(%{"port" => :port}, &1)`.
+
+      Two keys in one table that convert to the same term fail decoding instead of
+      overwriting each other. Key conversion errors have no line or column.
 
   ## Example
   ```
