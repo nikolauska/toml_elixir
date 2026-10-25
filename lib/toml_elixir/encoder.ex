@@ -376,75 +376,143 @@ defmodule TomlElixir.Encoder.Serializer do
   alias TomlElixir.Encoder.Error
   alias TomlElixir.Encoder.Helpers
 
-  def encode_to_iodata(data, _opts \\ []) do
-    {:ok, encode_map(data, [])}
-  rescue
-    exception -> {:error, %Error{reason: Exception.message(exception), path: error_path(data)}}
+  def encode_to_iodata(data, opts \\ [])
+  def encode_to_iodata(data, []), do: encode_root(data, false, %{})
+
+  def encode_to_iodata(data, opts) do
+    # Invalid options are caller bugs, so they raise instead of becoming an encode error.
+    multiline? = multiline_option!(opts[:multiline_arrays])
+    inline = opts[:inline_tables] |> inline_option!() |> Enum.reduce(%{}, &put_inline_path(&2, &1))
+    encode_root(data, multiline?, inline)
   end
 
-  defp encode_map(data, path) do
+  defp encode_root(data, multiline?, inline) do
+    {:ok, encode_map(data, [], multiline?, inline)}
+  rescue
+    exception -> {:error, %Error{reason: Exception.message(exception), path: error_path(data, inline)}}
+  end
+
+  defp multiline_option!(value) when value in [nil, false], do: false
+  defp multiline_option!(true), do: true
+
+  defp multiline_option!(other) do
+    raise ArgumentError, "invalid :multiline_arrays option #{inspect(other)}, expected a boolean"
+  end
+
+  defp inline_option!(nil), do: []
+
+  defp inline_option!(paths) when is_list(paths) do
+    Enum.map(paths, fn
+      [_ | _] = path -> Enum.map(path, &inline_key!/1)
+      other -> raise ArgumentError, "invalid :inline_tables path #{inspect(other)}, expected a non-empty list of keys"
+    end)
+  end
+
+  defp inline_option!(other) do
+    raise ArgumentError, "invalid :inline_tables option #{inspect(other)}, expected a list of key paths"
+  end
+
+  defp inline_key!(key) when is_binary(key) or is_atom(key), do: to_string(key)
+  defp inline_key!(key), do: raise(ArgumentError, "invalid :inline_tables key #{inspect(key)}, expected a string or atom")
+
+  # Inline paths become a tree keyed like the data, so each table only looks up its own
+  # children. `true` marks a table rendered inline; everything below it is inline too.
+  defp put_inline_path(true, _path), do: true
+  defp put_inline_path(node, [key]), do: Map.put(node, key, true)
+  defp put_inline_path(node, [key | rest]), do: Map.put(node, key, put_inline_path(Map.get(node, key, %{}), rest))
+
+  defp encode_map(data, path, multiline?, inline) do
     # Every entry is classified before any value is encoded so errors surface in the same order
     # as the former sort/split/map pipeline, while walking the entries only once per phase.
-    {scalars, complex} = data |> project() |> Helpers.sorted_pairs() |> classify([], [])
+    {scalars, complex} = data |> project() |> Helpers.sorted_pairs() |> classify(inline, [], [])
 
     # Scalars first in the current scope, then sub-tables and array of tables
-    [encode_scalars(scalars), encode_complex(complex, path)]
+    [encode_scalars(scalars, multiline?), encode_complex(complex, path, multiline?, inline)]
   end
 
   # Plain maps project to themselves; skip protocol dispatch for the common case.
   defp project(data) when is_map(data) and not is_struct(data), do: data
   defp project(data), do: TomlElixir.Encoder.project(data)
 
-  defp classify([{_key, value} = pair | rest], scalars, complex) do
+  # Tables chosen for inline rendering are encoded as values among the scalars. Guards cost
+  # no extra calls, and the size check short-circuits when there are no inline paths.
+  defp classify([{key, _value} = pair | rest], inline, scalars, complex)
+       when map_size(inline) > 0 and is_map_key(inline, key) and :erlang.map_get(key, inline) == true do
+    classify(rest, inline, [pair | scalars], complex)
+  end
+
+  defp classify([{_key, value} = pair | rest], inline, scalars, complex) do
     cond do
-      map_like?(value) -> classify(rest, scalars, [{:table, pair} | complex])
-      array_of_maps?(value) -> classify(rest, scalars, [{:array, pair} | complex])
-      true -> classify(rest, [pair | scalars], complex)
+      map_like?(value) -> classify(rest, inline, scalars, [{:table, pair} | complex])
+      array_of_maps?(value) -> classify(rest, inline, scalars, [{:array, pair} | complex])
+      true -> classify(rest, inline, [pair | scalars], complex)
     end
   end
 
-  defp classify([], scalars, complex), do: {:lists.reverse(scalars), :lists.reverse(complex)}
+  defp classify([], _inline, scalars, complex), do: {:lists.reverse(scalars), :lists.reverse(complex)}
 
-  defp encode_scalars([{key, value} | rest]) do
-    line = [Helpers.encode_pair(key, value), ?\n]
-    [line | encode_scalars(rest)]
+  # The multiline check lives in the clause heads so default encoding adds no call per scalar.
+  defp encode_scalars([{key, [_ | _] = list} | rest], true) do
+    line = [Helpers.encode_key(key), " = [\n", encode_lines(list, list), "]\n"]
+    [line | encode_scalars(rest, true)]
   end
 
-  defp encode_scalars([]), do: []
+  defp encode_scalars([{key, value} | rest], multiline?) do
+    line = [Helpers.encode_pair(key, value), ?\n]
+    [line | encode_scalars(rest, multiline?)]
+  end
 
-  defp encode_complex([{kind, {key, value}} | rest], path) do
+  defp encode_scalars([], _multiline?), do: []
+
+  # TOML allows a trailing comma, so every element line ends the same way.
+  defp encode_lines([value | rest], list), do: ["  ", Helpers.encode_value(value), ",\n" | encode_lines(rest, list)]
+  defp encode_lines([], _list), do: []
+  # Improper lists: let the inline encoder raise its usual error.
+  defp encode_lines(_tail, list), do: Helpers.encode_array(list)
+
+  defp encode_complex([{kind, {key, value}} | rest], path, multiline?, inline) do
+    # An inline branch instead of a helper call keeps the no-options path free of extra calls.
+    child_inline = if map_size(inline) == 0, do: inline, else: Map.get(inline, key, %{})
     key = Helpers.encode_key(key)
     # Reuse escaped parent segments across siblings and array entries.
     new_path = if path == [], do: key, else: [path, ?. | key]
-    table = encode_table(kind, value, new_path)
-    [table | encode_complex(rest, path)]
+    table = encode_table(kind, value, new_path, multiline?, child_inline)
+    [table | encode_complex(rest, path, multiline?, inline)]
   end
 
-  defp encode_complex([], _path), do: []
+  defp encode_complex([], _path, _multiline?, _inline), do: []
 
-  defp encode_table(:array, items, path) do
-    Enum.map(items, fn item -> ["\n[[", path, "]]\n" | encode_map(item, path)] end)
+  defp encode_table(:array, items, path, multiline?, inline) do
+    Enum.map(items, fn item -> ["\n[[", path, "]]\n" | encode_map(item, path, multiline?, inline)] end)
   end
 
-  defp encode_table(:table, map, path), do: ["\n[", path, "]\n" | encode_map(map, path)]
+  defp encode_table(:table, map, path, multiline?, inline) do
+    ["\n[", path, "]\n" | encode_map(map, path, multiline?, inline)]
+  end
 
   # Tracking keys while encoding would cost every successful call, so the failing path is
   # found afterwards by re-walking the input in the same order the serializer encodes it.
-  defp error_path(data), do: data |> table_error_path([]) |> List.wrap() |> Enum.reverse()
+  defp error_path(data, inline), do: data |> table_error_path([], inline) |> List.wrap() |> Enum.reverse()
 
-  defp table_error_path(data, path) do
-    case attempt(fn -> data |> project() |> Helpers.sorted_pairs() |> classify([], []) end) do
+  defp table_error_path(data, path, inline) do
+    case attempt(fn -> data |> project() |> Helpers.sorted_pairs() |> classify(inline, [], []) end) do
       {:ok, {scalars, complex}} ->
         Enum.find_value(scalars, fn {key, value} -> value_error_path(value, [key | path]) end) ||
-          Enum.find_value(complex, &complex_error_path(&1, path))
+          Enum.find_value(complex, &complex_error_path(&1, path, inline))
 
       :error ->
         path
     end
   end
 
-  defp complex_error_path({:table, {key, map}}, path), do: table_error_path(map, [key | path])
-  defp complex_error_path({:array, {key, items}}, path), do: items_error_path(items, 0, [key | path], &table_error_path/2)
+  defp complex_error_path({kind, {key, value}}, path, inline) do
+    child_inline = Map.get(inline, key, %{})
+
+    case kind do
+      :table -> table_error_path(value, [key | path], child_inline)
+      :array -> items_error_path(value, 0, [key | path], &table_error_path(&1, &2, child_inline))
+    end
+  end
 
   defp value_error_path(value, path) do
     case attempt(fn -> Helpers.encode_value(value) end) do

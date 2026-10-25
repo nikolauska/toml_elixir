@@ -1,6 +1,8 @@
 defmodule TomlElixir.EncodeTest do
   use TomlElixir.SpecCase, async: true
 
+  alias TomlElixir.Encoder.Error
+
   @toml_root Path.expand(".", __DIR__)
   for_result =
     for spec <- ["1.0.0", "1.1.0"] do
@@ -38,6 +40,8 @@ defmodule TomlElixir.EncodeTest do
       else
         encoded = TomlElixir.encode!(original)
         assert IO.iodata_to_binary(TomlElixir.encode_to_iodata!(original)) == encoded
+        multiline = TomlElixir.encode!(original, multiline_arrays: true)
+        assert normalize_for_test(TomlElixir.decode!(multiline, spec: spec_atom)) == normalize_for_test(original)
         {:ok, decoded} = TomlElixir.decode(encoded, spec: spec_atom)
 
         # Normalize both for comparison (esp. datetime precision)
@@ -60,15 +64,91 @@ defmodule TomlElixir.EncodeTest do
 
       assert TomlElixir.encode_to_iodata(data) == TomlElixir.encode(data)
 
-      assert_raise TomlElixir.Encoder.Error, "server.port: nil is not supported in TOML", fn ->
+      assert_raise Error, "server.port: nil is not supported in TOML", fn ->
         TomlElixir.encode_to_iodata!(data)
       end
     end
   end
 
-  describe "encode errors" do
-    alias TomlElixir.Encoder.Error
+  describe "formatting options" do
+    test "writes one array element per line with multiline_arrays" do
+      data = %{ports: [8000, 8001], empty: [], nested: [[1, 2]]}
 
+      assert TomlElixir.encode!(data, multiline_arrays: true) == """
+             empty = []
+             nested = [
+               [1, 2],
+             ]
+             ports = [
+               8000,
+               8001,
+             ]
+             """
+    end
+
+    test "renders selected tables and arrays of tables inline" do
+      data = %{
+        database: %{port: 1, targets: %{cpu: 79.5}},
+        points: [%{x: 1}, %{x: 2}],
+        other: %{a: 1}
+      }
+
+      assert TomlElixir.encode!(data, inline_tables: [[:database, :targets], ["points"]]) == """
+             points = [{x = 1}, {x = 2}]
+
+             [database]
+             port = 1
+             targets = {cpu = 79.5}
+
+             [other]
+             a = 1
+             """
+    end
+
+    test "applies inline paths through arrays of tables to every element" do
+      data = %{products: [%{dims: %{w: 1}}, %{dims: %{w: 2}}]}
+
+      assert TomlElixir.encode!(data, inline_tables: [[:products, :dims]]) == """
+
+             [[products]]
+             dims = {w = 1}
+
+             [[products]]
+             dims = {w = 2}
+             """
+    end
+
+    test "keeps a table inline when a path below it is also listed" do
+      data = %{a: %{b: %{c: 1}}}
+      expected = "a = {b = {c = 1}}\n"
+
+      assert TomlElixir.encode!(data, inline_tables: [[:a], [:a, :b]]) == expected
+      assert TomlElixir.encode!(data, inline_tables: [[:a, :b], [:a]]) == expected
+    end
+
+    test "combines options and reports error paths inside inline tables" do
+      data = %{points: [%{x: 1}, %{x: nil}]}
+
+      assert TomlElixir.encode!(%{points: [%{x: 1}]}, inline_tables: [[:points]], multiline_arrays: true) ==
+               "points = [\n  {x = 1},\n]\n"
+
+      assert {:error, %Error{path: ["points", 1, "x"]}} = TomlElixir.encode(data, inline_tables: [[:points]])
+    end
+
+    test "keeps the default output without options" do
+      data = %{a: [1, 2], t: %{b: 1}}
+      assert TomlElixir.encode!(data, multiline_arrays: false, inline_tables: []) == TomlElixir.encode!(data)
+    end
+
+    test "raises for invalid options" do
+      assert_raise ArgumentError, ~r/:multiline_arrays/, fn -> TomlElixir.encode(%{}, multiline_arrays: :yes) end
+      assert_raise ArgumentError, ~r/:inline_tables option/, fn -> TomlElixir.encode(%{}, inline_tables: :all) end
+      assert_raise ArgumentError, ~r/:inline_tables path/, fn -> TomlElixir.encode(%{}, inline_tables: [[]]) end
+      assert_raise ArgumentError, ~r/:inline_tables key/, fn -> TomlElixir.encode(%{}, inline_tables: [[1]]) end
+    end
+  end
+
+  describe "encode errors" do
     test "reports the key path of a nested failure" do
       assert {:error, %Error{reason: "nil is not supported in TOML", path: ["server", "port"]} = error} =
                TomlElixir.encode(%{server: %{port: nil}})

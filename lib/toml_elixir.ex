@@ -93,6 +93,20 @@ defmodule TomlElixir do
   @doc """
   Encode map to toml string.
 
+  Keys are sorted and output is deterministic. The options change the layout of generated
+  output; they do not preserve the formatting of a decoded document.
+
+  ## Options
+    * `:multiline_arrays` - when `true`, write each element of a non-empty array value on
+      its own line with a trailing comma. Arrays nested inside elements or inside inline
+      tables stay on one line, since TOML 1.0.0 restricts newlines in inline tables.
+      Defaults to `false`.
+    * `:inline_tables` - list of key paths whose tables, or arrays of tables, are written
+      as inline values such as `point = {x = 1, y = 2}` instead of `[point]` sections.
+      Paths are lists of string or atom keys without array indexes, so
+      `[[:products, :dims]]` applies to `dims` in every `products` entry. Everything
+      below an inline table is inline too. Defaults to `[]`.
+
   ## Example
   ```
   TomlElixir.encode(%{a: 1})
@@ -124,7 +138,7 @@ defmodule TomlElixir do
   @doc """
   Encode map to TOML as iodata.
 
-  Use this when the output goes to an API that accepts iodata, such as `File.write/3`
+  Accepts the same options as `encode/2`. Use this when the output goes to an API that accepts iodata, such as `File.write/3`
   or `:gen_tcp.send/2`, to skip building one contiguous binary. The whole output is
   still built in memory; this is not streaming encoding.
 

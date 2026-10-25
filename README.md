@@ -95,6 +95,9 @@ data = %{
 {:ok, toml_string} = TomlElixir.encode(data)
 toml_string = TomlElixir.encode!(data)
 
+# Optional layout controls; the default output is unchanged
+TomlElixir.encode!(data, multiline_arrays: true, inline_tables: [["database"]])
+
 # Iodata for APIs that accept it, such as File.write/3
 {:ok, iodata} = TomlElixir.encode_to_iodata(data)
 File.write!("config.toml", TomlElixir.encode_to_iodata!(data))
