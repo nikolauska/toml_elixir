@@ -28,13 +28,19 @@ defmodule TomlElixir.Parser.Document do
   end
 
   defp parse_statement(%State{} = state, pos, %Builder{} = builder) do
+    start = pos
+
     if State.peek_byte(state, pos) == ?[ do
       {pos, type, path} = parse_table_header(state, pos)
 
       builder =
-        case type do
-          :table -> Builder.define_table(builder, path)
-          :array_table -> Builder.define_array_table(builder, path)
+        try do
+          case type do
+            :table -> Builder.define_table(builder, path)
+            :array_table -> Builder.define_array_table(builder, path)
+          end
+        rescue
+          error in Error -> Error.reraise_at(error, start, __STACKTRACE__)
         end
 
       parse_document(state, consume_line_end(state, pos), builder)
@@ -44,7 +50,14 @@ defmodule TomlElixir.Parser.Document do
       pos = expect_char(state, pos, ?=)
       pos = skip_spaces(state, pos)
       {pos, value} = parse_value(state, pos)
-      builder = Builder.put_value(builder, key, value)
+
+      builder =
+        try do
+          Builder.put_value(builder, key, value)
+        rescue
+          error in Error -> Error.reraise_at(error, start, __STACKTRACE__)
+        end
+
       parse_document(state, consume_line_end(state, pos), builder)
     end
   end
@@ -66,7 +79,7 @@ defmodule TomlElixir.Parser.Document do
         {pos, :table, path}
 
       true ->
-        Error.raise("Invalid table header")
+        Error.raise("Invalid table header", pos)
     end
   end
 
@@ -99,7 +112,7 @@ defmodule TomlElixir.Parser.Document do
     case State.peek_byte(state, pos) do
       ?" ->
         if State.peek_prefix?(state, pos, "\"\"\"") do
-          Error.raise("Multiline strings are not allowed in keys")
+          Error.raise("Multiline strings are not allowed in keys", pos)
         end
 
         {value, pos} = Strings.parse_basic(state, pos, false)
@@ -107,7 +120,7 @@ defmodule TomlElixir.Parser.Document do
 
       ?' ->
         if State.peek_prefix?(state, pos, "'''") do
-          Error.raise("Multiline strings are not allowed in keys")
+          Error.raise("Multiline strings are not allowed in keys", pos)
         end
 
         {value, pos} = Strings.parse_literal(state, pos, false)
@@ -117,7 +130,7 @@ defmodule TomlElixir.Parser.Document do
         {token, pos} = take_bare_key(state, pos)
 
         if token == "" do
-          Error.raise("Invalid key")
+          Error.raise("Invalid key", pos)
         end
 
         {pos, token}
@@ -145,8 +158,8 @@ defmodule TomlElixir.Parser.Document do
     end
   end
 
-  defp parse_scalar(%State{} = state, pos) do
-    {token, pos} = take_value_token(state, pos)
+  defp parse_scalar(%State{} = state, start) do
+    {token, pos} = take_value_token(state, start)
 
     {token, pos} =
       if match?(<<_::binary-size(4), ?-, _::binary-size(2), ?-, _::binary-size(2)>>, token) and
@@ -170,10 +183,17 @@ defmodule TomlElixir.Parser.Document do
       end
 
     if token == "" do
-      Error.raise("Invalid value")
+      Error.raise("Invalid value", pos)
     end
 
-    {pos, Value.parse_scalar(token, state.spec)}
+    value =
+      try do
+        Value.parse_scalar(token, state.spec)
+      rescue
+        error in Error -> Error.reraise_at(error, start, __STACKTRACE__)
+      end
+
+    {pos, value}
   end
 
   defp parse_array(%State{} = state, pos) do
@@ -223,13 +243,20 @@ defmodule TomlElixir.Parser.Document do
     end
   end
 
-  defp parse_inline_table_pairs(%State{} = state, pos, table) do
-    {pos, key} = parse_key(state, pos)
+  defp parse_inline_table_pairs(%State{} = state, start, table) do
+    {pos, key} = parse_key(state, start)
     pos = skip_inline_ws(state, pos)
     pos = expect_char(state, pos, ?=)
     pos = skip_inline_ws(state, pos)
     {pos, value} = parse_value(state, pos)
-    table = Builder.put_inline_value(table, key, value)
+
+    table =
+      try do
+        Builder.put_inline_value(table, key, value)
+      rescue
+        error in Error -> Error.reraise_at(error, start, __STACKTRACE__)
+      end
+
     pos = skip_inline_ws(state, pos)
 
     case State.peek_byte(state, pos) do
@@ -240,7 +267,7 @@ defmodule TomlElixir.Parser.Document do
           if state.spec == :"1.1.0" do
             {pos, table}
           else
-            Error.raise("Trailing comma in inline table")
+            Error.raise("Trailing comma in inline table", pos)
           end
         else
           parse_inline_table_pairs(state, pos, table)
@@ -300,7 +327,7 @@ defmodule TomlElixir.Parser.Document do
     if State.peek_byte(state, pos) in [nil, ?\n, ?\r] do
       pos
     else
-      Error.raise("Control character in comment")
+      Error.raise("Control character in comment", pos)
     end
   end
 
@@ -325,7 +352,7 @@ defmodule TomlElixir.Parser.Document do
       nil -> pos
       ?\n -> pos + 1
       ?\r -> crlf_end(state, pos)
-      _ -> Error.raise("Unexpected characters after statement")
+      _ -> Error.raise("Unexpected characters after statement", pos)
     end
   end
 
@@ -333,7 +360,7 @@ defmodule TomlElixir.Parser.Document do
     if State.peek_byte(state, pos) == char do
       pos + 1
     else
-      Error.raise("Expected #{<<char::utf8>>}")
+      Error.raise("Expected #{<<char::utf8>>}", pos)
     end
   end
 
@@ -341,7 +368,7 @@ defmodule TomlElixir.Parser.Document do
     if State.peek_prefix?(state, pos, prefix) do
       pos + byte_size(prefix)
     else
-      Error.raise("Expected #{prefix}")
+      Error.raise("Expected #{prefix}", pos)
     end
   end
 
@@ -373,7 +400,7 @@ defmodule TomlElixir.Parser.Document do
     if State.peek_prefix?(state, pos, "\r\n") do
       pos + 2
     else
-      Error.raise("Bare carriage return")
+      Error.raise("Bare carriage return", pos)
     end
   end
 end

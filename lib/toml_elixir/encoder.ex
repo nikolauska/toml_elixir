@@ -373,10 +373,13 @@ end
 defmodule TomlElixir.Encoder.Serializer do
   @moduledoc false
 
+  alias TomlElixir.Encoder.Error
   alias TomlElixir.Encoder.Helpers
 
   def encode(data, _opts \\ []) do
     {:ok, data |> encode_map([]) |> IO.iodata_to_binary()}
+  rescue
+    exception -> {:error, %Error{reason: Exception.message(exception), path: error_path(data)}}
   end
 
   defp encode_map(data, path) do
@@ -424,6 +427,55 @@ defmodule TomlElixir.Encoder.Serializer do
   end
 
   defp encode_table(:table, map, path), do: ["\n[", path, "]\n" | encode_map(map, path)]
+
+  # Tracking keys while encoding would cost every successful call, so the failing path is
+  # found afterwards by re-walking the input in the same order the serializer encodes it.
+  defp error_path(data), do: data |> table_error_path([]) |> List.wrap() |> Enum.reverse()
+
+  defp table_error_path(data, path) do
+    case attempt(fn -> data |> project() |> Helpers.sorted_pairs() |> classify([], []) end) do
+      {:ok, {scalars, complex}} ->
+        Enum.find_value(scalars, fn {key, value} -> value_error_path(value, [key | path]) end) ||
+          Enum.find_value(complex, &complex_error_path(&1, path))
+
+      :error ->
+        path
+    end
+  end
+
+  defp complex_error_path({:table, {key, map}}, path), do: table_error_path(map, [key | path])
+  defp complex_error_path({:array, {key, items}}, path), do: items_error_path(items, 0, [key | path], &table_error_path/2)
+
+  defp value_error_path(value, path) do
+    case attempt(fn -> Helpers.encode_value(value) end) do
+      {:ok, _encoded} -> nil
+      :error -> nested_error_path(value, path) || path
+    end
+  end
+
+  defp nested_error_path(list, path) when is_list(list), do: items_error_path(list, 0, path, &value_error_path/2)
+
+  defp nested_error_path(map, path) when is_map(map) and not is_struct(map) do
+    case attempt(fn -> Helpers.sorted_pairs(map) end) do
+      {:ok, pairs} -> Enum.find_value(pairs, fn {key, value} -> value_error_path(value, [key | path]) end)
+      :error -> nil
+    end
+  end
+
+  defp nested_error_path(_value, _path), do: nil
+
+  # Walks manually so an improper list tail stops the search instead of raising.
+  defp items_error_path([item | rest], index, path, fun) do
+    fun.(item, [index | path]) || items_error_path(rest, index + 1, path, fun)
+  end
+
+  defp items_error_path(_tail, _index, _path, _fun), do: nil
+
+  defp attempt(fun) do
+    {:ok, fun.()}
+  rescue
+    _exception -> :error
+  end
 
   defp array_of_maps?(v) do
     is_list(v) and v != [] and Enum.all?(v, &map_like?/1)

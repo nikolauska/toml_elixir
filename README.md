@@ -68,6 +68,30 @@ data = %{
 toml_string = TomlElixir.encode!(data)
 ```
 
+### Errors
+
+Decoding errors include where the parser detected the problem. `line` and `column` are
+1-based, with columns counted in Unicode codepoints; `offset` is a 0-based byte offset
+into the input.
+
+```elixir
+{:error, %TomlElixir.Parser.Error{reason: "Invalid value nope", line: 2, column: 5, offset: 10} = error} =
+  TomlElixir.decode("a = 1\nb = nope")
+
+Exception.message(error)
+#=> "Invalid value nope at line 2, column 5"
+```
+
+Encoding errors include the path to the value that could not be encoded:
+
+```elixir
+{:error, %TomlElixir.Encoder.Error{path: ["servers", 1, "port"]} = error} =
+  TomlElixir.encode(%{servers: [%{port: 80}, %{port: nil}]})
+
+Exception.message(error)
+#=> "servers[1].port: nil is not supported in TOML"
+```
+
 ### Encoding Structs
 
 You can use the `TomlElixir.Encoder` protocol to allow your structs to be encoded as TOML.

@@ -45,6 +45,47 @@ defmodule TomlElixir.EncodeTest do
     end
   end
 
+  describe "encode errors" do
+    alias TomlElixir.Encoder.Error
+
+    test "reports the key path of a nested failure" do
+      assert {:error, %Error{reason: "nil is not supported in TOML", path: ["server", "port"]} = error} =
+               TomlElixir.encode(%{server: %{port: nil}})
+
+      assert Exception.message(error) == "server.port: nil is not supported in TOML"
+    end
+
+    test "reports array indexes in the path" do
+      assert {:error, %Error{path: ["servers", 1, "port"]}} =
+               TomlElixir.encode(%{servers: [%{port: 1}, %{port: nil}]})
+
+      assert {:error, %Error{path: ["a", 1, 1]} = error} = TomlElixir.encode(%{a: [1, [2, nil]]})
+      assert Exception.message(error) =~ ~r/^a\[1\]\[1\]: /
+    end
+
+    test "reports the first failure in encoding order" do
+      assert {:error, %Error{path: ["a"]}} = TomlElixir.encode(%{a: nil, b: %{c: nil}})
+      # Scalars are written before sub-tables, so `b` fails before `a.c`.
+      assert {:error, %Error{path: ["b"]}} = TomlElixir.encode(%{a: %{c: nil}, b: nil})
+    end
+
+    test "quotes keys that are not bare in the message" do
+      assert {:error, error} = TomlElixir.encode(%{"a b" => %{c: nil}})
+      assert Exception.message(error) == ~s("a b".c: nil is not supported in TOML)
+    end
+
+    test "uses an empty path for top-level failures" do
+      assert {:error, %Error{path: []} = error} = TomlElixir.encode(%{{1} => 1})
+      assert Exception.message(error) == error.reason
+    end
+
+    test "raises the error from encode!/2" do
+      assert_raise Error, "server.port: nil is not supported in TOML", fn ->
+        TomlElixir.encode!(%{server: %{port: nil}})
+      end
+    end
+  end
+
   defp contains_nan?(map) when is_map(map) do
     if Map.has_key?(map, :__struct__) do
       false

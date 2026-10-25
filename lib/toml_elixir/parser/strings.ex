@@ -35,7 +35,7 @@ defmodule TomlElixir.Parser.Strings do
   defp parse_basic_content(%State{} = state, pos, multiline?, acc) do
     cond do
       State.eof?(state, pos) ->
-        Error.raise("Unterminated string")
+        Error.raise("Unterminated string", pos)
 
       multiline? and State.peek_byte(state, pos) == ?\" ->
         case count_quote_run(state, pos, ?\", 0) do
@@ -60,14 +60,14 @@ defmodule TomlElixir.Parser.Strings do
             parse_basic_content(state, crlf_end(state, pos), multiline?, ["\n" | acc])
 
           newline when newline in [?\n, ?\r] ->
-            Error.raise("Newline in basic string")
+            Error.raise("Newline in basic string", pos)
 
           ?\\ ->
             {segment, pos} = parse_basic_escape(state, pos + 1, multiline?)
             parse_basic_content(state, pos, multiline?, [segment | acc])
 
           _control ->
-            Error.raise("Control character in string")
+            Error.raise("Control character in string", pos)
         end
     end
   end
@@ -75,7 +75,7 @@ defmodule TomlElixir.Parser.Strings do
   defp parse_literal_content(%State{} = state, pos, multiline?, acc) do
     cond do
       State.eof?(state, pos) ->
-        Error.raise("Unterminated literal string")
+        Error.raise("Unterminated literal string", pos)
 
       multiline? and State.peek_byte(state, pos) == ?' ->
         case count_quote_run(state, pos, ?', 0) do
@@ -100,10 +100,10 @@ defmodule TomlElixir.Parser.Strings do
             parse_literal_content(state, crlf_end(state, pos), multiline?, ["\n" | acc])
 
           newline when newline in [?\n, ?\r] ->
-            Error.raise("Newline in literal string")
+            Error.raise("Newline in literal string", pos)
 
           _control ->
-            Error.raise("Control character in literal string")
+            Error.raise("Control character in literal string", pos)
         end
     end
   end
@@ -137,7 +137,7 @@ defmodule TomlElixir.Parser.Strings do
         if state.spec == :"1.1.0" do
           {<<0x1B>>, pos + 1}
         else
-          Error.raise("Invalid escape sequence")
+          Error.raise("Invalid escape sequence", pos - 1)
         end
 
       ?f ->
@@ -162,17 +162,17 @@ defmodule TomlElixir.Parser.Strings do
         if state.spec == :"1.1.0" do
           parse_unicode_escape(state, pos + 1, 2)
         else
-          Error.raise("Invalid escape sequence")
+          Error.raise("Invalid escape sequence", pos - 1)
         end
 
       nil ->
-        Error.raise("Unterminated escape")
+        Error.raise("Unterminated escape", pos)
 
       _ when multiline? ->
         parse_line_continuation(state, pos)
 
       _ ->
-        Error.raise("Invalid escape sequence")
+        Error.raise("Invalid escape sequence", pos - 1)
     end
   end
 
@@ -180,7 +180,7 @@ defmodule TomlElixir.Parser.Strings do
     codepoint = hex_value(state, pos, digits, 0)
 
     if invalid_codepoint?(codepoint) do
-      Error.raise("Invalid Unicode codepoint")
+      Error.raise("Invalid Unicode codepoint", pos - 2)
     else
       {<<codepoint::utf8>>, pos + digits}
     end
@@ -190,11 +190,11 @@ defmodule TomlElixir.Parser.Strings do
 
   defp hex_value(%State{} = state, pos, remaining, acc) do
     case State.peek_byte(state, pos) do
-      nil -> Error.raise("Unexpected end of unicode escape")
+      nil -> Error.raise("Unexpected end of unicode escape", pos)
       digit when digit in ?0..?9 -> hex_value(state, pos + 1, remaining - 1, acc * 16 + digit - ?0)
       digit when digit in ?A..?F -> hex_value(state, pos + 1, remaining - 1, acc * 16 + digit - ?A + 10)
       digit when digit in ?a..?f -> hex_value(state, pos + 1, remaining - 1, acc * 16 + digit - ?a + 10)
-      _ -> Error.raise("Invalid unicode escape")
+      _ -> Error.raise("Invalid unicode escape", pos)
     end
   end
 
@@ -210,9 +210,9 @@ defmodule TomlElixir.Parser.Strings do
 
       _ ->
         if pos > start do
-          Error.raise("Invalid line continuation")
+          Error.raise("Invalid line continuation", pos)
         else
-          Error.raise("Invalid escape sequence")
+          Error.raise("Invalid escape sequence", start - 1)
         end
     end
   end
@@ -244,7 +244,7 @@ defmodule TomlElixir.Parser.Strings do
     if State.peek_prefix?(state, pos, "\r\n") do
       pos + 2
     else
-      Error.raise("Bare carriage return")
+      Error.raise("Bare carriage return", pos)
     end
   end
 
@@ -252,7 +252,7 @@ defmodule TomlElixir.Parser.Strings do
     if State.peek_prefix?(state, pos, prefix) do
       :ok
     else
-      Error.raise("Unexpected string delimiter")
+      Error.raise("Unexpected string delimiter", pos)
     end
   end
 
