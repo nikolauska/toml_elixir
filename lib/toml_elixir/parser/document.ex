@@ -83,7 +83,11 @@ defmodule TomlElixir.Parser.Document do
     end
   end
 
-  defp parse_key(%State{} = state, pos) do
+  # `parse_key/2`, `skip_spaces/2`, `skip_comment/2`, and `take_scalar_token/2` are shared
+  # with `TomlElixir.Document.Parser` so the lossless parser accepts exactly the same keys,
+  # comments, and scalar spans as decoding.
+  @doc false
+  def parse_key(%State{} = state, pos) do
     {pos, first} = parse_key_part(state, pos)
     parse_key_tail(state, pos, [first])
   end
@@ -159,28 +163,7 @@ defmodule TomlElixir.Parser.Document do
   end
 
   defp parse_scalar(%State{} = state, start) do
-    {token, pos} = take_value_token(state, start)
-
-    {token, pos} =
-      if match?(<<_::binary-size(4), ?-, _::binary-size(2), ?-, _::binary-size(2)>>, token) and
-           State.peek_byte(state, pos) == ?\s do
-        # A space may separate the date and time of a datetime.
-        case State.peek_byte(state, pos + 1) do
-          digit when digit in ?0..?9 ->
-            {time_part, time_end} = take_value_token(state, pos + 1)
-
-            if match?(<<_::binary-size(2), ?:, _::binary-size(2), _::binary>>, time_part) do
-              {token <> " " <> time_part, time_end}
-            else
-              {token, pos}
-            end
-
-          _ ->
-            {token, pos}
-        end
-      else
-        {token, pos}
-      end
+    {token, pos} = take_scalar_token(state, start)
 
     if token == "" do
       Error.raise("Invalid value", pos)
@@ -194,6 +177,31 @@ defmodule TomlElixir.Parser.Document do
       end
 
     {pos, value}
+  end
+
+  @doc false
+  def take_scalar_token(%State{} = state, start) do
+    {token, pos} = take_value_token(state, start)
+
+    if match?(<<_::binary-size(4), ?-, _::binary-size(2), ?-, _::binary-size(2)>>, token) and
+         State.peek_byte(state, pos) == ?\s do
+      # A space may separate the date and time of a datetime.
+      case State.peek_byte(state, pos + 1) do
+        digit when digit in ?0..?9 ->
+          {time_part, time_end} = take_value_token(state, pos + 1)
+
+          if match?(<<_::binary-size(2), ?:, _::binary-size(2), _::binary>>, time_part) do
+            {token <> " " <> time_part, time_end}
+          else
+            {token, pos}
+          end
+
+        _ ->
+          {token, pos}
+      end
+    else
+      {token, pos}
+    end
   end
 
   defp parse_array(%State{} = state, pos) do
@@ -289,7 +297,8 @@ defmodule TomlElixir.Parser.Document do
     end
   end
 
-  defp skip_spaces(%State{input: input}, pos), do: skip_space_index(input, pos)
+  @doc false
+  def skip_spaces(%State{input: input}, pos), do: skip_space_index(input, pos)
 
   defp skip_space_index(input, pos) when pos < byte_size(input) do
     if :binary.at(input, pos) in [?\s, ?\t], do: skip_space_index(input, pos + 1), else: pos
@@ -319,7 +328,8 @@ defmodule TomlElixir.Parser.Document do
     end
   end
 
-  defp skip_comment(%State{input: input} = state, pos) do
+  @doc false
+  def skip_comment(%State{input: input} = state, pos) do
     pos = expect_char(state, pos, ?#)
     <<_::binary-size(^pos), rest::binary>> = input
     pos = comment_end(rest, pos)

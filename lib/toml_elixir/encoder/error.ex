@@ -13,8 +13,6 @@ defmodule TomlElixir.Encoder.Error do
 
   @type t :: %__MODULE__{reason: String.t(), path: [String.t() | non_neg_integer]}
 
-  # The path leads because some underlying reasons, like protocol errors, span several lines.
   @spec message(t) :: String.t()
-  def message(%__MODULE__{reason: reason, path: []}), do: reason
-  def message(%__MODULE__{reason: reason, path: path}), do: "#{KeyPath.format(path)}: #{reason}"
+  def message(%__MODULE__{reason: reason, path: path}), do: KeyPath.prefix_message(reason, path)
 end

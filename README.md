@@ -14,6 +14,7 @@
 - **Strict Parsing**: Comprehensive error messages for invalid TOML documents.
 - **Spec Selection**: Allows you to choose which TOML version to follow during decoding.
 - **Struct Support**: Use the `TomlElixir.Encoder` protocol to encode custom structs via `@derive`.
+- **Format-Preserving Editing**: `TomlElixir.Document` changes values in a TOML file while keeping its comments, whitespace, and key order.
 
 ## Installation
 
@@ -101,6 +102,30 @@ TomlElixir.encode!(data, multiline_arrays: true, inline_tables: [["database"]])
 # Iodata for APIs that accept it, such as File.write/3
 {:ok, iodata} = TomlElixir.encode_to_iodata(data)
 File.write!("config.toml", TomlElixir.encode_to_iodata!(data))
+```
+
+### Editing TOML Without Losing Formatting
+
+`TomlElixir.Document` edits a document in place. Untouched parts render back exactly as
+written, including comments, key order, and value formats such as hex integers. New keys
+and tables are placed next to related content. See the `TomlElixir.Document` docs for
+the placement rules and current limits.
+
+```elixir
+toml = """
+# Server settings
+[server]
+port = 0x1F90 # hex on purpose
+"""
+
+doc =
+  toml
+  |> TomlElixir.Document.parse!()
+  |> TomlElixir.Document.put!(["server", "port"], 9090)
+  |> TomlElixir.Document.put!(["server", "host"], "0.0.0.0")
+
+TomlElixir.Document.to_string(doc)
+#=> "# Server settings\n[server]\nport = 9090 # hex on purpose\nhost = \"0.0.0.0\"\n"
 ```
 
 ### Errors
@@ -195,9 +220,10 @@ mix test
 # Run coverage report
 mix coveralls
 
-# Run decode and encode benchmarks separately (time, memory, and reductions)
+# Run decode, encode, and document editing benchmarks separately (time, memory, and reductions)
 mix run bench/decode.exs
 mix run bench/encode.exs
+mix run bench/document.exs
 ```
 
 ## License

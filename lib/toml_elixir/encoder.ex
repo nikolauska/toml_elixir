@@ -424,8 +424,11 @@ defmodule TomlElixir.Encoder.Serializer do
   end
 
   # Plain maps project to themselves; skip protocol dispatch for the common case.
-  defp project(data) when is_map(data) and not is_struct(data), do: data
-  defp project(data), do: TomlElixir.Encoder.project(data)
+  # `project/1`, `map_like?/1`, and `array_of_maps?/1` are shared with `TomlElixir.Document`
+  # so replacing a table there classifies values exactly like encoding does.
+  @doc false
+  def project(data) when is_map(data) and not is_struct(data), do: data
+  def project(data), do: TomlElixir.Encoder.project(data)
 
   # Tables chosen for inline rendering are encoded as values among the scalars. Guards cost
   # no extra calls, and the size check short-circuits when there are no inline paths.
@@ -538,11 +541,13 @@ defmodule TomlElixir.Encoder.Serializer do
     _exception -> :error
   end
 
-  defp array_of_maps?(v) do
+  @doc false
+  def array_of_maps?(v) do
     is_list(v) and v != [] and Enum.all?(v, &map_like?/1)
   end
 
-  defp map_like?(v) do
+  @doc false
+  def map_like?(v) do
     is_map(v) and not special_scalar?(v)
   end
 
