@@ -3,6 +3,7 @@
 ### Features
 
 * **Error Locations**: `TomlElixir.Parser.Error` now includes `line`, `column`, and `offset` fields, and its message ends with the line and column. Positions are computed only after a failure, so successful decoding does no extra work.
+* **Iodata Encoding**: Added `encode_to_iodata/2` and `encode_to_iodata!/2`, which return the serializer output as iodata for APIs such as `File.write/3` that accept it. They share the serializer and errors of `encode/2`. This is not streaming encoding; the whole output is still built in memory.
 * **Encoding Error Paths**: Encoding failures now return or raise `TomlElixir.Encoder.Error` with a `path` to the failing value, such as `["servers", 1, "port"]`. Previously the underlying exception, such as `RuntimeError` or `Protocol.UndefinedError`, was returned directly; its message is kept in `reason`.
 
 ## 3.2.1 (2026-10-07)

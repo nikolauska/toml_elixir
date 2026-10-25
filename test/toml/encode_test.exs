@@ -37,10 +37,31 @@ defmodule TomlElixir.EncodeTest do
         :ok
       else
         encoded = TomlElixir.encode!(original)
+        assert IO.iodata_to_binary(TomlElixir.encode_to_iodata!(original)) == encoded
         {:ok, decoded} = TomlElixir.decode(encoded, spec: spec_atom)
 
         # Normalize both for comparison (esp. datetime precision)
         assert normalize_for_test(decoded) == normalize_for_test(original)
+      end
+    end
+  end
+
+  describe "encode_to_iodata" do
+    test "returns iodata with the same content as encode/2" do
+      data = %{title: "x", server: %{ports: [1, 2]}, items: [%{a: 1}, %{a: 2}]}
+
+      assert {:ok, iodata} = TomlElixir.encode_to_iodata(data)
+      assert is_list(iodata)
+      assert IO.iodata_to_binary(iodata) == TomlElixir.encode!(data)
+    end
+
+    test "returns and raises the same errors as encode/2" do
+      data = %{server: %{port: nil}}
+
+      assert TomlElixir.encode_to_iodata(data) == TomlElixir.encode(data)
+
+      assert_raise TomlElixir.Encoder.Error, "server.port: nil is not supported in TOML", fn ->
+        TomlElixir.encode_to_iodata!(data)
       end
     end
   end

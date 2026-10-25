@@ -22,8 +22,11 @@ defmodule TomlElixir do
   * `TomlElixir.decode!/2`
   * `TomlElixir.encode/2`
   * `TomlElixir.encode!/2`
+  * `TomlElixir.encode_to_iodata/2`
+  * `TomlElixir.encode_to_iodata!/2`
   """
 
+  alias TomlElixir.Encoder.Error
   alias TomlElixir.Encoder.Serializer
 
   @type options :: map | keyword
@@ -68,9 +71,11 @@ defmodule TomlElixir do
   TomlElixir.encode(%{a: 1})
   ```
   """
-  @spec encode(map, options) :: {:ok, binary} | {:error, TomlElixir.Encoder.Error.t()}
+  @spec encode(map, options) :: {:ok, binary} | {:error, Error.t()}
   def encode(map, opts \\ []) when is_map(map) do
-    Serializer.encode(map, opts)
+    with {:ok, iodata} <- encode_to_iodata(map, opts) do
+      {:ok, IO.iodata_to_binary(iodata)}
+    end
   end
 
   @doc """
@@ -85,6 +90,40 @@ defmodule TomlElixir do
   def encode!(map, opts \\ []) when is_map(map) do
     case encode(map, opts) do
       {:ok, str} -> str
+      {:error, err} -> raise err
+    end
+  end
+
+  @doc """
+  Encode map to TOML as iodata.
+
+  Use this when the output goes to an API that accepts iodata, such as `File.write/3`
+  or `:gen_tcp.send/2`, to skip building one contiguous binary. The whole output is
+  still built in memory; this is not streaming encoding.
+
+  ## Example
+  ```
+  {:ok, iodata} = TomlElixir.encode_to_iodata(%{a: 1})
+  File.write!("config.toml", iodata)
+  ```
+  """
+  @spec encode_to_iodata(map, options) :: {:ok, iodata} | {:error, Error.t()}
+  def encode_to_iodata(map, opts \\ []) when is_map(map) do
+    Serializer.encode_to_iodata(map, opts)
+  end
+
+  @doc """
+  Same as `encode_to_iodata/2`, but raises error on failure.
+
+  ## Example
+  ```
+  TomlElixir.encode_to_iodata!(%{a: 1})
+  ```
+  """
+  @spec encode_to_iodata!(map, options) :: iodata
+  def encode_to_iodata!(map, opts \\ []) when is_map(map) do
+    case encode_to_iodata(map, opts) do
+      {:ok, iodata} -> iodata
       {:error, err} -> raise err
     end
   end

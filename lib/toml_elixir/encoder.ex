@@ -376,8 +376,8 @@ defmodule TomlElixir.Encoder.Serializer do
   alias TomlElixir.Encoder.Error
   alias TomlElixir.Encoder.Helpers
 
-  def encode(data, _opts \\ []) do
-    {:ok, data |> encode_map([]) |> IO.iodata_to_binary()}
+  def encode_to_iodata(data, _opts \\ []) do
+    {:ok, encode_map(data, [])}
   rescue
     exception -> {:error, %Error{reason: Exception.message(exception), path: error_path(data)}}
   end
