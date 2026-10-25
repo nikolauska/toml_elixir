@@ -48,6 +48,21 @@ defmodule TomlElixir do
 
       Two keys in one table that convert to the same term fail decoding instead of
       overwriting each other. Key conversion errors have no line or column.
+    * `:transform` - a 2-arity function called as `transform.(path, value)` for every value
+      in the document, returning the value to use. Use it to convert selected strings to
+      known values, validate settings, or build structs from tables.
+      * Values are visited children first, so a table's callback receives its transformed
+        children. The order between sibling keys is unspecified.
+      * `path` lists the TOML keys from the document root as strings, with integer indexes
+        for array elements, such as `["servers", 0, "port"]`. It uses the original keys
+        even when `:keys` converts them; the value's nested maps have converted keys.
+      * The callback is not called for the document map itself, so decoding always
+        returns a map.
+      * Raise to reject a value; `decode/2` then returns an error naming the path, with
+        no line or column.
+
+      This runs after decoding, so it cannot recover precision or formatting already lost
+      during scalar parsing.
 
   ## Example
   ```

@@ -64,6 +64,21 @@ TomlElixir.decode("[server]\nport = 80", keys: &Map.fetch!(mapping, &1))
 #=> {:ok, %{server: %{port: 80}}}
 ```
 
+Use `:transform` to convert or validate values as they are decoded. The callback gets the
+key path and the decoded value, children before their parent table, and returns the value
+to use. Raise to reject a value:
+
+```elixir
+transform = fn
+  ["server", "port"], port when port not in 1..65_535 -> raise ArgumentError, "port out of range"
+  ["server"], %{"host" => host, "port" => port} -> %MyApp.Server{host: host, port: port}
+  _path, value -> value
+end
+
+TomlElixir.decode("[server]\nhost = \"localhost\"\nport = 8080", transform: transform)
+#=> {:ok, %{"server" => %MyApp.Server{host: "localhost", port: 8080}}}
+```
+
 ### Encoding to TOML
 
 Convert an Elixir Map back into a valid TOML string.
