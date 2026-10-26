@@ -23,7 +23,7 @@ Add `toml_elixir` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:toml_elixir, "~> 3.2"}
+    {:toml_elixir, "~> 3.3"}
   ]
 end
 ```

@@ -1,4 +1,4 @@
-## Unreleased
+## 3.3.0 (2026-10-26)
 
 ### Features
 
